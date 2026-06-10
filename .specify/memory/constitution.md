@@ -1,26 +1,25 @@
 <!--
 SYNC IMPACT REPORT
 ==================
-Version change: (uninitialized template) → 1.0.0
-Bump rationale: Initial ratification of the project constitution.
+Version change: 1.0.0 → 1.1.0
+Bump rationale: MINOR — Principle I clarified (build-time vs runtime native
+dependencies) and a new phase-commit workflow rule added. Both changes are
+additive/clarifying; no prior compliance is invalidated.
 
-Defined principles (all template placeholders replaced):
-  - I.   Pure Rust, Zero Native Dependencies
-  - II.  Cross-Platform Parity (Windows, Linux, macOS)
-  - III. Library, Not I/O Owner
-  - IV.  Minimal Explicit Dependencies
-  - V.   Integration First, the API Is a Contract
+Amended:
+  - Principle I "Pure Rust, Zero Native Dependencies" — refined the ban to target
+    build-time system/native dependencies; explicitly allows pure-Rust transitive
+    *-sys/FFI crates that build without system packages and only load OS-provided
+    libraries at runtime (GPU drivers Vulkan/Metal/D3D12/OpenGL; RenderDoc; etc.).
+  - Development Workflow & Quality Gates — gate 2 ("Pure-Rust build check") reworded
+    to match Principle I; added a "Phase Commits" subsection requiring a
+    /speckit-git-commit after each Spec Kit phase, one commit per phase.
 
-Added sections:
-  - Technology & Language Constraints (SECTION_2)
-  - Development Workflow & Quality Gates (SECTION_3)
-
+Added sections: none (new subsection "Phase Commits" under Development Workflow).
 Removed sections: none
 
 Templates checked for consistency:
-  - .specify/templates/plan-template.md ............ ✅ compatible
-      ("Constitution Check" references the constitution dynamically; no hardcoded
-       principle list to update)
+  - .specify/templates/plan-template.md ............ ✅ compatible (Constitution Check is dynamic)
   - .specify/templates/spec-template.md ............ ✅ compatible (no constitution-bound content)
   - .specify/templates/tasks-template.md ........... ✅ compatible (no constitution-bound content)
 
@@ -39,17 +38,26 @@ principles that govern its design, implementation, and evolution.
 
 ### I. Pure Rust, Zero Native Dependencies
 
-The engine MUST build with `cargo` alone on a clean **stable** toolchain.
+The engine MUST build with `cargo` alone on a clean **stable** toolchain, with no
+system packages installed.
 
-- No system C/C++ libraries, no `*-sys` crates, and no FFI bindings to native
-  libraries are permitted in the dependency graph.
+- **Forbidden**: any dependency (including transitive) that requires system C/C++
+  libraries, headers, or a native toolchain to **build** — e.g. `cc`, `cmake`,
+  `pkg-config`, or vendored C/C++ sources.
+- **Allowed**: transitive pure-Rust `*-sys`/FFI crates that compile on the stable
+  toolchain without system packages and only **load OS-provided libraries at
+  runtime** (GPU drivers: Vulkan/Metal/D3D12/OpenGL; RenderDoc; and the like).
+- Direct use of native APIs in engine code is forbidden — all GPU access goes
+  through the `wgpu` API only.
 - No build step may require a system package manager, a pre-installed SDK, or any
-  non-Rust compiler.
-- Adding the engine to a project MUST be nothing more than `cargo add`.
+  non-Rust compiler; adding the engine to a project MUST be nothing more than
+  `cargo add`.
 
-**Rationale**: A pure-Rust dependency graph guarantees reproducible,
-cross-platform builds and trivial integration. It eliminates the entire class of
-"works on my machine" failures caused by missing or mismatched system libraries.
+**Rationale**: The goal is a reproducible cross-platform `cargo build` on clean
+stable, free of "works on my machine" failures from missing system libraries.
+Runtime FFI to GPU drivers is unavoidable by design and is encapsulated inside
+`wgpu` — forbidding it would forbid GPU rendering itself. What matters is that no
+**build** step needs a system package or a C/C++ toolchain.
 
 ### II. Cross-Platform Parity (Windows, Linux, macOS)
 
@@ -132,8 +140,10 @@ Every pull request MUST satisfy the following gates before it can merge:
 
 1. **Cross-platform CI green** — builds and tests pass on Windows, Linux, and
    macOS (Principle II).
-2. **Pure-Rust check** — no new `*-sys`, FFI, or system-dependent crate enters the
-   dependency graph (Principle I).
+2. **Pure-Rust build check** — no new dependency requires system C/C++ libraries,
+   headers, or a native toolchain to build; `cargo build` stays clean on stable with
+   no system packages (Principle I). Pure-Rust transitive `*-sys`/FFI crates that only
+   load OS libraries at runtime are allowed.
 3. **Dependency justification** — any new dependency is justified in the PR
    description (Principle IV).
 4. **API contract review** — public API breaking changes are flagged, require a
@@ -145,6 +155,17 @@ Every pull request MUST satisfy the following gates before it can merge:
 Reviewers MUST verify constitution compliance as part of every review. Any
 deviation MUST be either removed or explicitly justified (and recorded) before
 merge; unjustified violations are grounds for rejection.
+
+### Phase Commits
+
+Spec Kit work MUST be committed phase by phase:
+
+- After completing **each** Spec Kit phase (`specify`, `clarify`, `plan`, `tasks`,
+  `implement`), a git commit MUST be made via `/speckit-git-commit` before moving to
+  the next phase.
+- Commit messages are written in English and are concise: the phase plus the
+  artifacts touched.
+- One commit equals one phase; changes from different phases MUST NOT be mixed.
 
 ## Governance
 
@@ -176,4 +197,4 @@ principle; if it cannot be justified, it MUST be removed. Runtime development
 guidance for AI agents lives in `CLAUDE.md` and MUST stay consistent with this
 constitution.
 
-**Version**: 1.0.0 | **Ratified**: 2026-06-09 | **Last Amended**: 2026-06-09
+**Version**: 1.1.0 | **Ratified**: 2026-06-09 | **Last Amended**: 2026-06-10
