@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(& \".specify/scripts/powershell/setup-plan.ps1\" -Json)",
+      "WebSearch",
+      "PowerShell(& \".specify/scripts/powershell/setup-tasks.ps1\" -Json)",
+      "PowerShell(& \".specify/scripts/powershell/check-prerequisites.ps1\" -Json -RequireTasks -IncludeTasks)",
+      "PowerShell(cargo build *)",
+      "PowerShell(cargo clippy *)",
+      "PowerShell(cargo add *)",
+      "PowerShell(& \".specify/scripts/powershell/check-prerequisites.ps1\" -Json -RequireTasks -IncludeTasks; Write-Output \"---GITSTATUS---\"; git status --short)"
+    ]
+  }
+}
