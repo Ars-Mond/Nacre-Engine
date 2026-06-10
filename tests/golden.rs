@@ -470,7 +470,7 @@ fn custom_mesh_renders() {
 
 // ---- Golden-image comparison (T042, FR-019) ----
 
-const REGEN_ENV: &str = "NACRE_REGENERATE_GOLDENS";
+const REGEN_ENV: &str = "UPDATE_GOLDEN";
 
 /// Prefer a software adapter (WARP / lavapipe) so golden output is deterministic and
 /// machine-independent; fall back to any adapter (e.g. hardware Metal on macOS, which
@@ -582,4 +582,120 @@ fn golden_cube_directional() {
         wgpu::Color::BLACK,
     );
     compare_or_regenerate("cube_directional", &px, dim);
+}
+
+#[test]
+fn golden_custom_mesh() {
+    let Some((device, queue)) = headless_deterministic() else {
+        return;
+    };
+    let mut engine = new_engine(&device, &queue);
+    let mesh = engine.create_mesh(&device, &quad()).expect("valid mesh");
+    let lights = [Light::Directional {
+        direction: Vec3::new(0.0, 0.0, -1.0),
+        color: Vec3::ONE,
+        intensity: 3.0,
+    }];
+    let scene = Scene {
+        camera: test_camera(),
+        mesh,
+        transform: Mat4::IDENTITY,
+        material: gray_material(),
+        lights: &lights,
+    };
+    let dim = 256;
+    let px = render_scene(
+        &device,
+        &queue,
+        &mut engine,
+        &scene,
+        dim,
+        full(dim),
+        wgpu::Color::BLACK,
+    );
+    compare_or_regenerate("custom_mesh", &px, dim);
+}
+
+#[test]
+fn golden_material_metal() {
+    let Some((device, queue)) = headless_deterministic() else {
+        return;
+    };
+    let mut engine = new_engine(&device, &queue);
+    let sphere = engine.builtin_mesh(&device, Primitive::Sphere);
+    let lights = [Light::Directional {
+        direction: Vec3::new(-0.3, -0.3, -1.0),
+        color: Vec3::ONE,
+        intensity: 3.0,
+    }];
+    let scene = Scene {
+        camera: test_camera(),
+        mesh: sphere,
+        transform: Mat4::IDENTITY,
+        material: Material {
+            base_color: Vec4::new(0.9, 0.7, 0.3, 1.0),
+            metallic: 1.0,
+            roughness: 0.15,
+            normal_map: None,
+            occlusion_map: None,
+        },
+        lights: &lights,
+    };
+    let dim = 256;
+    let px = render_scene(
+        &device,
+        &queue,
+        &mut engine,
+        &scene,
+        dim,
+        full(dim),
+        wgpu::Color::BLACK,
+    );
+    compare_or_regenerate("material_metal", &px, dim);
+}
+
+#[test]
+fn golden_multi_light() {
+    let Some((device, queue)) = headless_deterministic() else {
+        return;
+    };
+    let mut engine = new_engine(&device, &queue);
+    let cube = engine.builtin_mesh(&device, Primitive::Cube);
+    let lights = [
+        Light::Directional {
+            direction: Vec3::new(-0.4, -0.4, -1.0),
+            color: Vec3::new(1.0, 0.9, 0.8),
+            intensity: 2.0,
+        },
+        Light::Point {
+            position: Vec3::new(1.5, 1.0, 1.5),
+            color: Vec3::new(0.2, 0.4, 1.0),
+            intensity: 4.0,
+            range: 8.0,
+        },
+        Light::Point {
+            position: Vec3::new(-1.5, -0.5, 1.0),
+            color: Vec3::new(1.0, 0.3, 0.2),
+            intensity: 3.0,
+            range: 8.0,
+        },
+    ];
+    let scene = Scene {
+        camera: test_camera(),
+        mesh: cube,
+        transform: Mat4::from_rotation_y(0.6) * Mat4::from_rotation_x(0.3),
+        material: gray_material(),
+        lights: &lights,
+    };
+    let dim = 256;
+    let px = render_scene(
+        &device,
+        &queue,
+        &mut engine,
+        &scene,
+        dim,
+        full(dim),
+        wgpu::Color::BLACK,
+    );
+    compare_or_regenerate("multi_light", &px, dim);
 }

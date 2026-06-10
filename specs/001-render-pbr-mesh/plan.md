@@ -101,6 +101,7 @@ Cargo.toml               # [package] nacre-engine (library) + [workspace] member
 src/
 ├── lib.rs               # Public API surface + re-exports (Engine, Scene, types)
 ├── engine.rs            # Engine: new(), update(), prepare(), render(); owns GPU resources
+├── error.rs             # EngineError (mesh-validation error type)
 ├── scene.rs             # Scene, Camera, Light, Viewport (host-facing input types)
 ├── mesh.rs              # MeshData, Vertex (bytemuck), MeshHandle, built-in cube/sphere
 ├── material.rs          # Material (scalars + optional host texture views), internal defaults

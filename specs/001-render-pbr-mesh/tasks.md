@@ -95,7 +95,7 @@ shading, and invalid data returns `EngineError` at `create_mesh`.
 - [x] T024 [US2] Implement `create_mesh(device, &MeshData) -> Result<MeshHandle, EngineError>` with validation (non-empty, attribute length parity, `indices.len() % 3 == 0`, every index < vertex count) in `src/mesh.rs`
 - [x] T025 [P] [US2] Implement `builtin_mesh(Primitive::Sphere)` (UV sphere with generated normals + tangents) in `src/mesh.rs`
 - [x] T026 [P] [US2] Add unit tests for mesh validation errors (length mismatch, out-of-range index, non-triangle index count) — implemented as a `#[cfg(test)]` module in `src/mesh.rs` (validator is `pub(crate)`)
-- [ ] T027 [P] [US2] Add a golden test for a custom indexed mesh rendering equivalently to a built-in under the same scene (`tests/golden/<platform>/custom_mesh.png`) in `tests/golden.rs`
+- [x] T027 [P] [US2] Add a golden test for a custom indexed mesh rendering equivalently to a built-in under the same scene (`tests/golden/<platform>/custom_mesh.png`) in `tests/golden.rs`
 - [x] T028 [US2] Add a mesh-source toggle (built-in vs custom) to `examples/raw-wgpu/src/main.rs`
 
 **Checkpoint**: Custom and built-in geometry both render; US1 still works.
@@ -113,7 +113,7 @@ adds detail, and omitting it falls back with no error.
 - [x] T029 [US3] Add normal-map sampling + tangent-space normal reconstruction to `src/shaders/pbr.wgsl`, gated by the `has_normal_map` flag with geometric-normal fallback
 - [x] T030 [US3] Add AO-map sampling gated by the `has_occlusion_map` flag and apply it to the lit result in `src/shaders/pbr.wgsl`
 - [x] T031 [US3] Wire `Material.normal_map`/`occlusion_map` (`Option<&TextureView>`) into the material bind group — bind the host view or the 1×1 placeholder and set `flags` accordingly — in `src/material.rs` and `src/engine.rs`
-- [ ] T032 [P] [US3] Add golden tests for material response (rough dielectric vs smooth metal, SC-005) and normal-map on/off (`tests/golden/<platform>/material_*.png`) in `tests/golden.rs`
+- [x] T032 [P] [US3] Add golden tests for material response (rough dielectric vs smooth metal, SC-005) and normal-map on/off (`tests/golden/<platform>/material_*.png`) in `tests/golden.rs`
 
 **Checkpoint**: Full material control works; earlier stories still pass.
 
@@ -128,7 +128,7 @@ an empty light slice renders black without error.
 
 - [x] T033 [US4] Add the point-light term (inverse-square falloff + `range` cutoff) to `src/shaders/pbr.wgsl` and iterate `0..count` lights, branching on `kind` for directional vs point
 - [x] T034 [US4] Pack a `&[Light]` (0..=`MAX_LIGHTS`) into `LightsUniform` with `count`, clamping with a warning when the slice exceeds `MAX_LIGHTS`, in `src/engine.rs`
-- [ ] T035 [P] [US4] Add a golden test for directional + two point lights (`tests/golden/<platform>/multi_light.png`) and assert an empty light slice renders without error in `tests/golden.rs`
+- [x] T035 [P] [US4] Add a golden test for directional + two point lights (`tests/golden/<platform>/multi_light.png`) and assert an empty light slice renders without error in `tests/golden.rs`
 
 **Checkpoint**: Multi-light scenes work; earlier stories still pass.
 
