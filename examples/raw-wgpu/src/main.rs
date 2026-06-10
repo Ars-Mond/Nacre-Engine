@@ -81,7 +81,8 @@ impl State {
             present_mode: wgpu::PresentMode::Fifo,
             alpha_mode: caps.alpha_modes[0],
             view_formats: vec![],
-            desired_maximum_frame_latency: 2,
+            // Latency 1 keeps dragging responsive (fewer frames queued behind vsync).
+            desired_maximum_frame_latency: 1,
         };
         surface.configure(&device, &config);
 
@@ -263,11 +264,17 @@ impl ApplicationHandler for App {
                 Key::Named(NamedKey::Escape) => event_loop.exit(),
                 _ => {}
             },
-            WindowEvent::RedrawRequested => {
-                state.render();
-                state.window.request_redraw();
-            }
+            WindowEvent::RedrawRequested => state.render(),
             _ => {}
+        }
+    }
+
+    fn about_to_wait(&mut self, _event_loop: &ActiveEventLoop) {
+        // Drive continuous redraws here rather than from RedrawRequested, so the
+        // Windows modal move/resize loop keeps animating smoothly instead of stalling
+        // on a self-scheduled redraw that blocks behind vsync.
+        if let Some(state) = self.state.as_ref() {
+            state.window.request_redraw();
         }
     }
 }
