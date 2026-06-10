@@ -157,7 +157,7 @@ widget bounds, with no engine code changes vs the raw-wgpu path.
 - [x] T040 [P] Add rustdoc to the public API (`Engine`, lifecycle, `Scene`, types) with a crate-level usage example in `src/lib.rs`; ensure `cargo doc` is clean
 - [x] T041 [P] Ensure `cargo fmt --check` and `cargo clippy --all-targets -- -D warnings` are clean across the workspace
 - [x] T042 Generate and commit the per-platform golden images and document the regeneration procedure (env var + review step) in `tests/golden.rs`
-- [ ] T043 Validate quickstart scenarios 1–6 end to end and update `specs/001-render-pbr-mesh/quickstart.md` if any step drifted
+- [x] T043 Validate quickstart scenarios 1–6 end to end and update `specs/001-render-pbr-mesh/quickstart.md` if any step drifted
 - [x] T044 [P] Add the `log` facade and emit a `warn!` when a scene exceeds `MAX_LIGHTS` instead of silently truncating, per Principle VI (done: commit 25df342)
 - [x] T045 [P] Enforce the Principle VI/VIII clippy lints (`print_stdout`, `print_stderr`, `dbg_macro`, `undocumented_unsafe_blocks` = deny) for the library in `src/lib.rs` (done: commit 25df342)
 

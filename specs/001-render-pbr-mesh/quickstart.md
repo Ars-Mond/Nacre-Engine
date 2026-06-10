@@ -24,19 +24,20 @@ without owning any I/O.
 cargo run -p raw-wgpu
 ```
 
-**Expected**: a window opens showing a shaded cube (or sphere) lit by a directional light, with
-correct depth occlusion. The engine created no window/device — the example did. Resizing the
-window keeps the object correctly rendered (depth buffer recreated, FR-014 / SC-006).
+**Expected**: a window opens showing a shaded, animated cube lit by a directional + point light,
+with correct depth occlusion. The engine created no window/device — the example did. Press
+**Space** to cycle cube → sphere → custom mesh; **Esc** quits. Resizing the window keeps the
+object correctly rendered (depth buffer recreated, FR-014 / SC-006).
 
 ## Scenario 2 — Custom geometry (US2)
 
 Proves: developer-supplied vertices (position/normal/uv/tangent) + indices render through the
 same path as built-ins.
 
-In the raw-wgpu example, switch the mesh from `engine.builtin_mesh(.., Primitive::Cube)` to
-`engine.create_mesh(.., &custom_mesh_data)`. **Expected**: the custom geometry renders with
-correct shading; an invalid mesh (length mismatch / out-of-range index) returns `EngineError`
-at `create_mesh`, not a crash at render.
+In the raw-wgpu example, press **Space** twice to reach the custom mesh — a `create_mesh` quad
+uploaded at startup. **Expected**: the custom geometry renders through the same path as the
+built-ins. Invalid mesh data (length mismatch / out-of-range index) returns `EngineError` from
+`create_mesh` — covered by the `mesh::tests` unit tests — never a render-time crash.
 
 ## Scenario 3 — Material control (US3)
 
@@ -72,8 +73,9 @@ differs from the raw-wgpu path.
 
 Proves: the engine only writes inside the viewport.
 
-The raw-wgpu example renders into a sub-rectangle of a pre-filled target. **Expected**: every
-pixel outside the viewport is unchanged from its pre-fill value.
+The `viewport_containment_leaves_outside_untouched` golden test clears the target to red, renders
+into a centered sub-viewport, and checks that every pixel outside the viewport stays red.
+**Expected**: the test passes (`cargo test --test golden`).
 
 ## Golden-image tests (cross-platform parity, FR-019)
 
@@ -83,17 +85,22 @@ Headless render-to-texture comparisons; no window required.
 cargo test --test golden
 ```
 
-**Expected**: each scene's readback matches its per-platform golden within tolerance — ≥99% of
-pixels within ±2/255 per channel, none beyond ±8 (SC-004). Goldens live under
-`tests/golden/<platform>/`. To (re)generate goldens intentionally, run with the regeneration
-env var documented in `tests/golden.rs` and review the diffs before committing.
+**Expected**: each scene's readback matches its per-OS golden within the FR-019 tolerance — ≥99%
+of channels within ±2/255, none beyond ±8 (SC-004). Goldens live under `tests/golden/<os>/`
+(`cube_directional`, `custom_mesh`, `material_metal`, `multi_light`). The
+`golden_cross_platform_ssim` test additionally asserts SSIM ≥ 0.99 between any two per-OS goldens
+of a scene (skipping with a warning until a scene has goldens on ≥2 platforms).
+
+To (re)generate goldens intentionally, run `UPDATE_GOLDEN=1 cargo test --test golden` and review
+the diffs before committing. To produce Linux/macOS goldens, dispatch the **update-golden** CI
+job (Actions → CI → Run workflow) and commit the uploaded PNG artifacts.
 
 ## Quality gates (run before every PR)
 
 ```text
-cargo fmt --check
-cargo clippy --all-targets -- -D warnings
-cargo test
+cargo fmt --all -- --check
+cargo clippy --workspace --all-targets -- -D warnings
+cargo test --workspace
 ```
 
 CI runs all of the above on Windows, Linux, and macOS (constitution Principle II); a failure on
@@ -101,8 +108,10 @@ any OS blocks merge.
 
 ## Done-when (feature acceptance)
 
-- [ ] Scenarios 1–6 behave as described on a local machine.
-- [ ] `cargo test --test golden` passes on all three OSes in CI.
-- [ ] The library graph (`cargo tree`) contains `wgpu` + `glam` + `bytemuck` and no `*-sys`
-      crate (Principle I audit, research §10).
-- [ ] `fmt`, `clippy`, and `test` gates are green on all three OSes.
+- [x] Scenarios 1–6 behave as described on a local machine (verified on Windows).
+- [ ] `cargo test --test golden` passes on all three OSes in CI (Windows goldens committed;
+      Linux/macOS goldens generated via the update-golden job).
+- [x] The library graph (`cargo tree`) is `wgpu` + `glam` + `bytemuck` + `log` plus only
+      pure-Rust transitive `*-sys` crates that build with no system packages (Principle I as
+      amended in constitution v1.1.0; research §10).
+- [x] `fmt`, `clippy`, and `test` gates are green locally (and on Windows CI once dispatched).
