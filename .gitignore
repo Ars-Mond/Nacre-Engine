@@ -1,1 +1,11 @@
 /target
+
+# Backup / build artifacts
+**/*.rs.bk
+*.pdb
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

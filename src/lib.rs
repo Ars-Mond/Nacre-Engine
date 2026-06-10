@@ -9,8 +9,26 @@
 //! Physically based lighting uses the metallic-roughness workflow with a
 //! Cook-Torrance BRDF. Shaders are authored in WGSL and run on every `wgpu`
 //! backend (DX12, Vulkan, Metal, GLES).
-//!
-//! This is an early scaffold; the public rendering API is not defined yet.
+
+mod depth;
+mod engine;
+mod error;
+mod material;
+mod mesh;
+mod pipeline;
+mod scene;
+mod uniforms;
+
+pub use engine::{Engine, EngineConfig};
+pub use error::EngineError;
+pub use material::Material;
+pub use mesh::{MeshData, MeshHandle, Primitive};
+pub use scene::{Camera, Light, Scene, Viewport};
+pub use uniforms::MAX_LIGHTS;
+
+// Re-export the exact dependency versions so hosts share one crate instance.
+pub use glam;
+pub use wgpu;
 
 /// The crate version, taken from `Cargo.toml` at build time.
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");

@@ -2,5 +2,18 @@
 name = "nacre-engine"
 version = "0.1.0"
 edition = "2024"
+description = "Minimal real-time PBR engine/renderer on wgpu, embeddable in wgpu apps and iced."
+license = "MIT OR Apache-2.0"
+autoexamples = false
 
 [dependencies]
+bytemuck = { version = "1.25.0", features = ["derive"] }
+glam = "0.33.1"
+wgpu = "^27"
+
+[dev-dependencies]
+image = { version = "0.25", default-features = false, features = ["png"] }
+pollster = "0.4.0"
+
+[workspace]
+members = ["examples/raw-wgpu"]
