@@ -37,7 +37,7 @@ member crates under `examples/` and golden fixtures under `tests/golden/`.
 - [x] T004 [P] Scaffold the raw-wgpu example member crate (`nacre-engine` path dep + `winit` + `pollster` + `wgpu = "27"`) in `examples/raw-wgpu/Cargo.toml` and a stub `examples/raw-wgpu/src/main.rs`
 - [ ] T005 [P] Scaffold the iced-demo example member crate (`nacre-engine` path dep + `iced = "0.14"`) in `examples/iced-demo/Cargo.toml` and a stub `examples/iced-demo/src/main.rs`
 - [x] T006 [P] Add `.gitattributes` with `* text=auto eol=lf` for cross-platform line-ending parity (Principle II) in `.gitattributes`
-- [ ] T007 [P] Add the CI matrix (Windows/Linux/macOS) running `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`, and `cargo test`, provisioning software adapters (lavapipe on Linux, WARP on Windows) for headless tests, in `.github/workflows/ci.yml`
+- [x] T007 [P] Add the CI matrix (Windows/Linux/macOS) running `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`, and `cargo test`, provisioning software adapters (lavapipe on Linux, WARP on Windows) for headless tests, in `.github/workflows/ci.yml`
 - [x] T008 [P] Remove the superseded placeholder example `examples/demo.rs` (replaced by `examples/raw-wgpu`)
 
 **Checkpoint**: `cargo build` succeeds for an empty workspace; example crates compile as stubs.

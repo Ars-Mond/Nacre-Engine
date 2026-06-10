@@ -10,19 +10,26 @@ use nacre_engine::{
 
 const TARGET_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba8UnormSrgb;
 
-/// Try to acquire a headless device/queue. Returns `None` if no adapter exists.
+/// Try to acquire a headless device/queue, preferring a real adapter and falling back
+/// to a software adapter (WARP on Windows, lavapipe on Linux, Metal on macOS). Returns
+/// `None` and logs the reason when no adapter is available, so a GPU test is skipped
+/// (not failed) on a runner without any usable adapter.
 fn headless() -> Option<(wgpu::Device, wgpu::Queue)> {
     pollster::block_on(async {
         let instance = wgpu::Instance::new(&wgpu::InstanceDescriptor::default());
-        let adapter = instance
-            .request_adapter(&wgpu::RequestAdapterOptions {
-                power_preference: wgpu::PowerPreference::default(),
-                force_fallback_adapter: false,
-                compatible_surface: None,
-            })
-            .await
-            .ok()?;
-        let (device, queue) = adapter
+        let adapter = match request_adapter(&instance, false).await {
+            Some(a) => a,
+            None => match request_adapter(&instance, true).await {
+                Some(a) => a,
+                None => {
+                    eprintln!(
+                        "[skip] no wgpu adapter available (hardware or software); GPU test ignored"
+                    );
+                    return None;
+                }
+            },
+        };
+        match adapter
             .request_device(&wgpu::DeviceDescriptor {
                 label: Some("nacre-test-device"),
                 required_features: wgpu::Features::empty(),
@@ -32,9 +39,25 @@ fn headless() -> Option<(wgpu::Device, wgpu::Queue)> {
                 trace: wgpu::Trace::Off,
             })
             .await
-            .ok()?;
-        Some((device, queue))
+        {
+            Ok(device_queue) => Some(device_queue),
+            Err(e) => {
+                eprintln!("[skip] adapter found but request_device failed ({e}); GPU test ignored");
+                None
+            }
+        }
     })
+}
+
+async fn request_adapter(instance: &wgpu::Instance, fallback: bool) -> Option<wgpu::Adapter> {
+    instance
+        .request_adapter(&wgpu::RequestAdapterOptions {
+            power_preference: wgpu::PowerPreference::default(),
+            force_fallback_adapter: fallback,
+            compatible_surface: None,
+        })
+        .await
+        .ok()
 }
 
 /// Render `scene` into a `dim`x`dim` offscreen sRGB texture cleared to `clear`,
@@ -218,7 +241,6 @@ fn quad() -> MeshData {
 #[test]
 fn directional_lit_cube_is_visible() {
     let Some((device, queue)) = headless() else {
-        eprintln!("skipping: no wgpu adapter available");
         return;
     };
     let mut engine = new_engine(&device, &queue);

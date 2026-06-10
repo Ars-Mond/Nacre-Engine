@@ -1,0 +1,59 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  check:
+    name: ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install stable toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Cache cargo build
+        uses: Swatinem/rust-cache@v2
+
+      # Software Vulkan (lavapipe) so the headless GPU tests can run without a real
+      # GPU. This is a *runtime* test dependency, not a build dependency — the crate
+      # still builds on clean stable with no system packages (constitution Principle I,
+      # clarified in v1.1.0). Windows uses the built-in WARP software adapter and macOS
+      # uses Metal, so neither needs an install.
+      - name: Install lavapipe (software Vulkan) on Linux
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y mesa-vulkan-drivers vulkan-tools libvulkan1
+
+      - name: Format
+        run: cargo fmt --all -- --check
+
+      - name: Clippy
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+      # The reference integrations are workspace member crates, so --workspace builds
+      # them (equivalent to "build the examples").
+      - name: Build
+        run: cargo build --workspace --all-targets
+
+      # --nocapture surfaces a GPU test's skip reason if a runner has no usable adapter.
+      - name: Test
+        run: cargo test --workspace -- --nocapture
