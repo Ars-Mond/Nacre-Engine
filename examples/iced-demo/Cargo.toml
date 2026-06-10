@@ -1,0 +1,12 @@
+[package]
+name = "iced-demo"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+nacre-engine = { path = "../.." }
+iced = { version = "0.14", features = ["wgpu"] }
+
+[dev-dependencies]
+pollster = "0.4"

@@ -17,4 +17,4 @@ image = { version = "0.25", default-features = false, features = ["png"] }
 pollster = "0.4.0"
 
 [workspace]
-members = ["examples/raw-wgpu"]
+members = ["examples/raw-wgpu", "examples/iced-demo"]

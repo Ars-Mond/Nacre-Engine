@@ -35,7 +35,7 @@ member crates under `examples/` and golden fixtures under `tests/golden/`.
 - [x] T002 Declare dependencies in `Cargo.toml`: `wgpu = "27"`, `glam`, `bytemuck` (with `derive`); `[dev-dependencies]` `pollster`, `image`
 - [x] T003 [P] Create the library module skeleton (declare `engine`, `scene`, `mesh`, `material`, `pipeline`, `uniforms`, `depth` modules and re-export the public API; keep `VERSION`) in `src/lib.rs`
 - [x] T004 [P] Scaffold the raw-wgpu example member crate (`nacre-engine` path dep + `winit` + `pollster` + `wgpu = "27"`) in `examples/raw-wgpu/Cargo.toml` and a stub `examples/raw-wgpu/src/main.rs`
-- [ ] T005 [P] Scaffold the iced-demo example member crate (`nacre-engine` path dep + `iced = "0.14"`) in `examples/iced-demo/Cargo.toml` and a stub `examples/iced-demo/src/main.rs`
+- [x] T005 [P] Scaffold the iced-demo example member crate (`nacre-engine` path dep + `iced = "0.14"`) in `examples/iced-demo/Cargo.toml` and a stub `examples/iced-demo/src/main.rs`
 - [x] T006 [P] Add `.gitattributes` with `* text=auto eol=lf` for cross-platform line-ending parity (Principle II) in `.gitattributes`
 - [x] T007 [P] Add the CI matrix (Windows/Linux/macOS) running `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`, and `cargo test`, provisioning software adapters (lavapipe on Linux, WARP on Windows) for headless tests, in `.github/workflows/ci.yml`
 - [x] T008 [P] Remove the superseded placeholder example `examples/demo.rs` (replaced by `examples/raw-wgpu`)
@@ -141,9 +141,9 @@ an empty light slice renders black without error.
 **Independent Test**: Run `cargo run -p iced-demo` and see the same scene render inside the iced
 widget bounds, with no engine code changes vs the raw-wgpu path.
 
-- [ ] T036 [US5] Implement `NacrePrimitive` (iced `shader::Primitive`) in `examples/iced-demo/src/main.rs`: `prepare` → `engine.prepare`; `render` → begin a pass with the iced target as color and `engine.depth_view()` as depth, scissor = `clip_bounds`, then `engine.render`; import wgpu via `iced::widget::shader::wgpu`
-- [ ] T037 [US5] Build the iced application hosting the `shader` widget rendering the same scene as the raw-wgpu example in `examples/iced-demo/src/main.rs`
-- [ ] T038 [US5] Add an iced-integration smoke check (headless `prepare` call drives the engine with no panic and no engine-side host branching) in `examples/iced-demo/src/main.rs`
+- [x] T036 [US5] Implement `NacrePrimitive` (iced `shader::Primitive`) in `examples/iced-demo/src/main.rs`: `prepare` → `engine.prepare`; `render` → begin a pass with the iced target as color and `engine.depth_view()` as depth, scissor = `clip_bounds`, then `engine.render`; import wgpu via `iced::widget::shader::wgpu`
+- [x] T037 [US5] Build the iced application hosting the `shader` widget rendering the same scene as the raw-wgpu example in `examples/iced-demo/src/main.rs`
+- [x] T038 [US5] Add an iced-integration smoke check (headless `prepare` call drives the engine with no panic and no engine-side host branching) in `examples/iced-demo/src/main.rs`
 
 **Checkpoint**: Both reference integrations exercise the same public API (SC-003).
 
