@@ -4,6 +4,7 @@ on:
   push:
     branches: [main, master]
   pull_request:
+  workflow_dispatch:
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -57,3 +58,41 @@ jobs:
       # --nocapture surfaces a GPU test's skip reason if a runner has no usable adapter.
       - name: Test
         run: cargo test --workspace -- --nocapture
+
+  # Manually dispatched: regenerate per-OS golden images on each runner and upload them
+  # as artifacts. Download and commit the PNGs by hand (goldens are reviewed, not
+  # auto-committed). Run from the Actions tab → CI → "Run workflow".
+  update-golden:
+    name: update-golden (${{ matrix.os }})
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install stable toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo build
+        uses: Swatinem/rust-cache@v2
+
+      - name: Install lavapipe (software Vulkan) on Linux
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y mesa-vulkan-drivers vulkan-tools libvulkan1
+
+      - name: Regenerate goldens
+        env:
+          UPDATE_GOLDEN: "1"
+        run: cargo test --test golden -- --nocapture
+
+      - name: Upload goldens
+        uses: actions/upload-artifact@v4
+        with:
+          name: goldens-${{ runner.os }}
+          path: tests/golden/**/*.png
+          if-no-files-found: error

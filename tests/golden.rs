@@ -496,11 +496,14 @@ fn headless_deterministic() -> Option<(wgpu::Device, wgpu::Queue)> {
     })
 }
 
-fn golden_dir() -> std::path::PathBuf {
+fn golden_root() -> std::path::PathBuf {
     std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("tests")
         .join("golden")
-        .join(std::env::consts::OS)
+}
+
+fn golden_dir() -> std::path::PathBuf {
+    golden_root().join(std::env::consts::OS)
 }
 
 /// Compare RGBA8 `pixels` (`dim`x`dim`) against the per-OS golden PNG `name` using the
@@ -698,4 +701,116 @@ fn golden_multi_light() {
         wgpu::Color::BLACK,
     );
     compare_or_regenerate("multi_light", &px, dim);
+}
+
+/// Windowed mean SSIM (8x8 blocks) on luma, in `[0, 1]` — a standard-shaped structural
+/// similarity measure for the cross-platform golden equivalence check (FR-019).
+fn ssim(a: &[u8], b: &[u8], width: u32, height: u32) -> f64 {
+    let luma = |px: &[u8]| -> Vec<f64> {
+        px.chunks_exact(4)
+            .map(|c| 0.299 * c[0] as f64 + 0.587 * c[1] as f64 + 0.114 * c[2] as f64)
+            .collect()
+    };
+    let la = luma(a);
+    let lb = luma(b);
+    let w = width as usize;
+    let h = height as usize;
+    const WIN: usize = 8;
+    let c1 = (0.01 * 255.0_f64).powi(2);
+    let c2 = (0.03 * 255.0_f64).powi(2);
+
+    let mut total = 0.0;
+    let mut count = 0usize;
+    let mut y = 0;
+    while y + WIN <= h {
+        let mut x = 0;
+        while x + WIN <= w {
+            let n = (WIN * WIN) as f64;
+            let (mut sa, mut sb) = (0.0, 0.0);
+            for j in 0..WIN {
+                for i in 0..WIN {
+                    let idx = (y + j) * w + (x + i);
+                    sa += la[idx];
+                    sb += lb[idx];
+                }
+            }
+            let (ma, mb) = (sa / n, sb / n);
+            let (mut va, mut vb, mut cov) = (0.0, 0.0, 0.0);
+            for j in 0..WIN {
+                for i in 0..WIN {
+                    let idx = (y + j) * w + (x + i);
+                    let (da, db) = (la[idx] - ma, lb[idx] - mb);
+                    va += da * da;
+                    vb += db * db;
+                    cov += da * db;
+                }
+            }
+            va /= n - 1.0;
+            vb /= n - 1.0;
+            cov /= n - 1.0;
+            total += ((2.0 * ma * mb + c1) * (2.0 * cov + c2))
+                / ((ma * ma + mb * mb + c1) * (va + vb + c2));
+            count += 1;
+            x += WIN;
+        }
+        y += WIN;
+    }
+    if count == 0 {
+        1.0
+    } else {
+        total / count as f64
+    }
+}
+
+/// FR-019 cross-platform equivalence: any two per-OS goldens of the same scene must be
+/// perceptually equivalent (SSIM >= 0.99). Scenes with fewer than two per-OS goldens are
+/// skipped with a warning until those goldens are generated (via the update-golden CI job).
+#[test]
+fn golden_cross_platform_ssim() {
+    const SCENES: [&str; 4] = [
+        "cube_directional",
+        "custom_mesh",
+        "material_metal",
+        "multi_light",
+    ];
+    const OSES: [&str; 3] = ["windows", "linux", "macos"];
+
+    let mut compared = 0usize;
+    for scene in SCENES {
+        let mut imgs: Vec<(&str, image::RgbaImage)> = Vec::new();
+        for os in OSES {
+            let path = golden_root().join(os).join(format!("{scene}.png"));
+            match image::open(&path) {
+                Ok(img) => imgs.push((os, img.to_rgba8())),
+                Err(_) => eprintln!("[warn] no {os} golden for `{scene}`; cross-OS check skipped"),
+            }
+        }
+        if imgs.len() < 2 {
+            eprintln!(
+                "[warn] `{scene}`: need >=2 per-OS goldens to compare, have {}",
+                imgs.len()
+            );
+            continue;
+        }
+        for i in 0..imgs.len() {
+            for j in (i + 1)..imgs.len() {
+                let (na, a) = (imgs[i].0, &imgs[i].1);
+                let (nb, b) = (imgs[j].0, &imgs[j].1);
+                assert_eq!(
+                    (a.width(), a.height()),
+                    (b.width(), b.height()),
+                    "golden size mismatch {na} vs {nb} for `{scene}`"
+                );
+                let s = ssim(a.as_raw(), b.as_raw(), a.width(), a.height());
+                assert!(
+                    s >= 0.99,
+                    "SSIM {s:.4} between {na} and {nb} for `{scene}` is below 0.99"
+                );
+                compared += 1;
+            }
+        }
+    }
+    if compared == 0 {
+        eprintln!("[warn] cross-platform SSIM: no scene has >=2 per-OS goldens yet");
+    }
 }
