@@ -1,27 +1,32 @@
 <!--
 SYNC IMPACT REPORT
 ==================
-Version change: 1.0.0 → 1.1.0
-Bump rationale: MINOR — Principle I clarified (build-time vs runtime native
-dependencies) and a new phase-commit workflow rule added. Both changes are
-additive/clarifying; no prior compliance is invalidated.
+Version change: 1.1.0 → 1.2.0
+Bump rationale: MINOR — three new non-negotiable principles added. Additive; no
+existing principle (I–V) is changed or removed.
 
-Amended:
-  - Principle I "Pure Rust, Zero Native Dependencies" — refined the ban to target
-    build-time system/native dependencies; explicitly allows pure-Rust transitive
-    *-sys/FFI crates that build without system packages and only load OS-provided
-    libraries at runtime (GPU drivers Vulkan/Metal/D3D12/OpenGL; RenderDoc; etc.).
-  - Development Workflow & Quality Gates — gate 2 ("Pure-Rust build check") reworded
-    to match Principle I; added a "Phase Commits" subsection requiring a
-    /speckit-git-commit after each Spec Kit phase, one commit per phase.
+Added principles:
+  - VI.   Structured Logging Discipline
+  - VII.  Phase Commit Discipline
+  - VIII. Safe Code Discipline
 
-Added sections: none (new subsection "Phase Commits" under Development Workflow).
-Removed sections: none
+Consolidated:
+  - The "Phase Commits" subsection added under Development Workflow in v1.1.0 is
+    promoted to Principle VII and removed from Development Workflow to avoid
+    duplicating its normative text.
+
+Principles I–V: unchanged.
+Removed sections: none (the Phase Commits subsection was promoted, not dropped).
 
 Templates checked for consistency:
   - .specify/templates/plan-template.md ............ ✅ compatible (Constitution Check is dynamic)
   - .specify/templates/spec-template.md ............ ✅ compatible (no constitution-bound content)
   - .specify/templates/tasks-template.md ........... ✅ compatible (no constitution-bound content)
+
+Follow-up (implementation work, not part of this amendment):
+  - Add the `log` facade; replace silent light-cap clamping with a `warn!`; enforce
+    clippy print_stdout/print_stderr/dbg_macro/undocumented_unsafe_blocks = deny for
+    the library; review `.expect()` sites against Principle VIII.
 
 Deferred / TODO placeholders: none
 -->
@@ -115,6 +120,60 @@ Integration is the primary deliverable; the public API is a contract.
 Stability of that contract is the product; unannounced breakage would betray every
 integrator at once.
 
+### VI. Structured Logging Discipline
+
+All logging MUST go through the `log` crate facade (`error!`, `warn!`, `info!`,
+`debug!`, `trace!`).
+
+- `println!`, `eprintln!`, and `dbg!` are FORBIDDEN in committed code. Exception:
+  `examples/`, where stdout output is part of the demonstration.
+- Log messages MUST be in English and self-sufficient for diagnosis from a single
+  log file: they include context (the operation, the file path / identifier, counts,
+  sizes).
+- Swallowing errors is forbidden: code that catches an error MUST either propagate it
+  or log it via `warn!`/`error!` with context. Silent `let _ = ...` and empty `Err`
+  arms are violations.
+- Enforcement: the clippy lints `print_stdout`, `print_stderr`, and `dbg_macro` are
+  set to `deny` for library code.
+
+**Rationale**: One structured, leveled log stream makes failures diagnosable in the
+field without a debugger; ad-hoc prints and silently dropped errors hide problems
+from the host application that embeds the engine.
+
+### VII. Phase Commit Discipline
+
+Spec Kit work MUST be committed phase by phase.
+
+- After completing **each** Spec Kit phase (`specify`, `clarify`, `plan`, `tasks`,
+  `implement`), a git commit MUST be made via `/speckit-git-commit` before moving to
+  the next phase.
+- Commit messages are written in English and are concise: the phase plus the
+  artifacts touched.
+- One commit equals one phase; changes from different phases MUST NOT be mixed.
+  Mixing is allowed only when a phase produced no changes.
+
+**Rationale**: Phase-aligned commits keep history legible and reviewable, make each
+Spec Kit step independently revertible, and stop unrelated changes from riding along.
+
+### VIII. Safe Code Discipline
+
+Committed code MUST avoid panics and undisciplined `unsafe`.
+
+- `.unwrap()` is FORBIDDEN in committed code; `.expect()` is allowed ONLY with a
+  message explaining why the failure is impossible (an invariant). Errors are handled
+  through `Result`/`Option`, the `?` operator, and meaningful error types. Exception:
+  `#[cfg(test)]`, tests, and `examples/`.
+- `unsafe` is permitted ONLY when its necessity is proven, and STRICTLY by Rust
+  community conventions:
+  - the smallest possible block scope;
+  - a mandatory `// SAFETY:` comment justifying the invariants above every `unsafe`
+    block;
+  - `unsafe` encapsulated behind a safe public API;
+  - the clippy lint `undocumented_unsafe_blocks` set to `deny`.
+
+**Rationale**: Panics turn recoverable conditions into crashes for the embedding host;
+disciplined, documented `unsafe` keeps memory safety auditable.
+
 ## Technology & Language Constraints
 
 **Shaders**: WGSL only. Hand-written GLSL/HLSL/MSL targeting individual backends is
@@ -154,18 +213,8 @@ Every pull request MUST satisfy the following gates before it can merge:
 
 Reviewers MUST verify constitution compliance as part of every review. Any
 deviation MUST be either removed or explicitly justified (and recorded) before
-merge; unjustified violations are grounds for rejection.
-
-### Phase Commits
-
-Spec Kit work MUST be committed phase by phase:
-
-- After completing **each** Spec Kit phase (`specify`, `clarify`, `plan`, `tasks`,
-  `implement`), a git commit MUST be made via `/speckit-git-commit` before moving to
-  the next phase.
-- Commit messages are written in English and are concise: the phase plus the
-  artifacts touched.
-- One commit equals one phase; changes from different phases MUST NOT be mixed.
+merge; unjustified violations are grounds for rejection. Phase-by-phase commits are
+governed by Principle VII.
 
 ## Governance
 
@@ -197,4 +246,4 @@ principle; if it cannot be justified, it MUST be removed. Runtime development
 guidance for AI agents lives in `CLAUDE.md` and MUST stay consistent with this
 constitution.
 
-**Version**: 1.1.0 | **Ratified**: 2026-06-09 | **Last Amended**: 2026-06-10
+**Version**: 1.2.0 | **Ratified**: 2026-06-09 | **Last Amended**: 2026-06-10
