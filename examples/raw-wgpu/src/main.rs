@@ -8,9 +8,11 @@
 //!
 //! Rendering runs on a **separate thread** so it is decoupled from the OS modal
 //! move/resize loop (on Windows that loop blocks the event-loop thread, which would
-//! otherwise freeze a main-thread render). The event-loop thread only forwards
-//! resize / cycle-mesh / exit messages to the render thread over a channel — the
-//! reference pattern for winit + wgpu.
+//! otherwise freeze a main-thread render). GPU setup (surface/device) happens on the
+//! main thread — winit only exposes the raw window handle there — and the ready state
+//! is moved into the render thread; the event-loop thread then only forwards
+//! resize / cycle-mesh / exit messages over a channel — the reference pattern for
+//! winit + wgpu.
 //!
 //! Run with: `cargo run -p raw-wgpu` (Space: cycle mesh, Esc: quit).
 
@@ -243,8 +245,12 @@ impl State {
 /// The render loop: own the GPU state and draw continuously. `Fifo` present paces the
 /// loop to vsync, so it stays at refresh rate without busy-spinning, independent of the
 /// event-loop thread (and thus of the OS modal move/resize loop).
-fn render_loop(window: Arc<Window>, rx: Receiver<RenderMsg>) {
-    let mut state = pollster::block_on(State::new(window));
+///
+/// `State` is created on the main thread and moved in: winit only hands out the raw
+/// window handle on the main thread, so `create_surface` panics with
+/// `RawHandle(Unavailable)` if attempted here. All wgpu resources are `Send`, so
+/// moving the constructed state across threads is fine.
+fn render_loop(mut state: State, rx: Receiver<RenderMsg>) {
     loop {
         loop {
             match rx.try_recv() {
@@ -273,11 +279,14 @@ impl ApplicationHandler for App {
         let attrs = Window::default_attributes().with_title("NacreEngine — raw wgpu");
         let window = Arc::new(event_loop.create_window(attrs).expect("create window"));
 
+        // Create the surface/device on the MAIN thread (winit exposes the raw window
+        // handle only here), then hand the ready state to the render thread.
+        let state = pollster::block_on(State::new(window.clone()));
+
         let (tx, rx) = mpsc::channel();
-        let render_window = window.clone();
         let handle = std::thread::Builder::new()
             .name("nacre-render".into())
-            .spawn(move || render_loop(render_window, rx))
+            .spawn(move || render_loop(state, rx))
             .expect("spawn render thread");
 
         self.window = Some(window);
