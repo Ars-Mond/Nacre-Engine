@@ -8,7 +8,8 @@
       "PowerShell(cargo build *)",
       "PowerShell(cargo clippy *)",
       "PowerShell(cargo add *)",
-      "PowerShell(& \".specify/scripts/powershell/check-prerequisites.ps1\" -Json -RequireTasks -IncludeTasks; Write-Output \"---GITSTATUS---\"; git status --short)"
+      "PowerShell(& \".specify/scripts/powershell/check-prerequisites.ps1\" -Json -RequireTasks -IncludeTasks; Write-Output \"---GITSTATUS---\"; git status --short)",
+      "PowerShell(cargo test *)"
     ]
   }
 }

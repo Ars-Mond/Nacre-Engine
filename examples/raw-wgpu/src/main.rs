@@ -14,13 +14,14 @@ use std::time::Instant;
 use nacre_engine::glam::{Mat4, Vec3, Vec4};
 use nacre_engine::wgpu;
 use nacre_engine::{
-    Camera, Engine, EngineConfig, Light, Material, MeshHandle, Primitive, Scene, Viewport,
+    Camera, Engine, EngineConfig, Light, Material, MeshData, MeshHandle, Primitive, Scene, Viewport,
 };
 
 use winit::application::ApplicationHandler;
 use winit::dpi::PhysicalSize;
-use winit::event::WindowEvent;
+use winit::event::{ElementState, KeyEvent, WindowEvent};
 use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
+use winit::keyboard::{Key, NamedKey};
 use winit::window::{Window, WindowId};
 
 /// Host-owned GPU + engine state.
@@ -31,7 +32,9 @@ struct State {
     queue: wgpu::Queue,
     config: wgpu::SurfaceConfiguration,
     engine: Engine,
-    mesh: MeshHandle,
+    /// Built-in cube, built-in sphere, and a custom mesh — cycled with Space.
+    meshes: Vec<MeshHandle>,
+    active: usize,
     start: Instant,
 }
 
@@ -90,7 +93,11 @@ impl State {
                 sample_count: 1,
             },
         );
-        let mesh = engine.builtin_mesh(&device, Primitive::Cube);
+        let cube = engine.builtin_mesh(&device, Primitive::Cube);
+        let sphere = engine.builtin_mesh(&device, Primitive::Sphere);
+        let custom = engine
+            .create_mesh(&device, &custom_quad())
+            .expect("valid custom mesh");
 
         State {
             window,
@@ -99,9 +106,14 @@ impl State {
             queue,
             config,
             engine,
-            mesh,
+            meshes: vec![cube, sphere, custom],
+            active: 0,
             start: Instant::now(),
         }
+    }
+
+    fn cycle_mesh(&mut self) {
+        self.active = (self.active + 1) % self.meshes.len();
     }
 
     fn resize(&mut self, size: PhysicalSize<u32>) {
@@ -136,7 +148,7 @@ impl State {
         ];
         let scene = Scene {
             camera,
-            mesh: self.mesh,
+            mesh: self.meshes[self.active],
             transform: Mat4::from_rotation_y(t * 0.6) * Mat4::from_rotation_x(t * 0.25),
             material: Material {
                 base_color: Vec4::new(0.85, 0.4, 0.2, 1.0),
@@ -238,6 +250,19 @@ impl ApplicationHandler for App {
         match event {
             WindowEvent::CloseRequested => event_loop.exit(),
             WindowEvent::Resized(size) => state.resize(size),
+            WindowEvent::KeyboardInput {
+                event:
+                    KeyEvent {
+                        state: ElementState::Pressed,
+                        logical_key,
+                        ..
+                    },
+                ..
+            } => match logical_key {
+                Key::Named(NamedKey::Space) => state.cycle_mesh(),
+                Key::Named(NamedKey::Escape) => event_loop.exit(),
+                _ => {}
+            },
             WindowEvent::RedrawRequested => {
                 state.render();
                 state.window.request_redraw();
@@ -247,7 +272,24 @@ impl ApplicationHandler for App {
     }
 }
 
+/// A custom indexed quad facing +Z, demonstrating `Engine::create_mesh`.
+fn custom_quad() -> MeshData {
+    MeshData {
+        positions: vec![
+            [-0.7, -0.7, 0.0],
+            [0.7, -0.7, 0.0],
+            [0.7, 0.7, 0.0],
+            [-0.7, 0.7, 0.0],
+        ],
+        normals: vec![[0.0, 0.0, 1.0]; 4],
+        uvs: vec![[0.0, 1.0], [1.0, 1.0], [1.0, 0.0], [0.0, 0.0]],
+        tangents: vec![[1.0, 0.0, 0.0, 1.0]; 4],
+        indices: vec![0, 1, 2, 0, 2, 3],
+    }
+}
+
 fn main() {
+    println!("NacreEngine raw-wgpu demo — Space: cycle mesh (cube / sphere / custom), Esc: quit");
     let event_loop = EventLoop::new().expect("create event loop");
     event_loop.set_control_flow(ControlFlow::Poll);
     let mut app = App::default();

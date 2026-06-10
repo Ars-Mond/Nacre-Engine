@@ -9,14 +9,25 @@ pub enum EngineError {
     EmptyGeometry,
     /// A per-vertex attribute did not match the position count.
     AttributeLengthMismatch {
+        /// Name of the mismatched attribute (e.g. `"normals"`).
         attribute: &'static str,
+        /// Expected length (the position count).
         expected: usize,
+        /// Actual length found.
         found: usize,
     },
     /// An index referenced a vertex outside the buffer.
-    IndexOutOfRange { index: u32, vertex_count: u32 },
+    IndexOutOfRange {
+        /// The offending index value.
+        index: u32,
+        /// Number of vertices available.
+        vertex_count: u32,
+    },
     /// The index count was not a multiple of three (not whole triangles).
-    IndicesNotTriangles { len: usize },
+    IndicesNotTriangles {
+        /// The index count that was not a multiple of three.
+        len: usize,
+    },
 }
 
 impl fmt::Display for EngineError {

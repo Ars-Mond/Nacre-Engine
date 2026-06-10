@@ -34,7 +34,9 @@ impl Vertex {
 /// A built-in primitive shape.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Primitive {
+    /// Unit cube centered at the origin (half-extent 0.5).
     Cube,
+    /// UV sphere of radius 0.5 centered at the origin.
     Sphere,
 }
 
@@ -42,10 +44,15 @@ pub enum Primitive {
 /// tangents (xyz + handedness w) are required (no auto-generation in this feature).
 #[derive(Clone, Debug, Default)]
 pub struct MeshData {
+    /// Per-vertex positions.
     pub positions: Vec<[f32; 3]>,
+    /// Per-vertex normals (same length as `positions`).
     pub normals: Vec<[f32; 3]>,
+    /// Per-vertex texture coordinates (same length as `positions`).
     pub uvs: Vec<[f32; 2]>,
+    /// Per-vertex tangents as xyz + handedness `w` (same length as `positions`).
     pub tangents: Vec<[f32; 4]>,
+    /// Triangle indices: length a multiple of 3, each value `< positions.len()`.
     pub indices: Vec<u32>,
 }
 

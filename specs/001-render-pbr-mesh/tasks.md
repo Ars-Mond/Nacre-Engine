@@ -77,8 +77,8 @@ drawn into the host frame within the viewport; the engine creates no window/devi
 - [x] T019 [US1] Add the directional-light Cook-Torrance term to `src/shaders/pbr.wgsl` (GGX `D`, Smith-Schlick `G`, Schlick `F`, `F0 = mix(0.04, base_color, metallic)`, Lambert diffuse × `(1 - metallic)`, summed over directional lights; linear output)
 - [x] T020 [US1] Implement the scalar-material path (bind placeholders for absent maps, `flags = 0`) so the frame renders from `base_color`/`metallic`/`roughness` in `src/material.rs`
 - [x] T021 [US1] Implement the raw-wgpu reference integration in `examples/raw-wgpu/src/main.rs`: winit window + host adapter/device/queue/surface, engine creation, per-frame `update`/`prepare`/begin-pass-with-`depth_view()`/`render`/submit, directional light + camera + built-in cube, and resize handling (depth recreated via `prepare`)
-- [ ] T022 [P] [US1] Implement golden-test infrastructure in `tests/golden.rs`: request a headless adapter (no surface), render a scene to an offscreen texture, read it back, and compare to a PNG using the FR-019 metric (≥99% pixels within ±2/255, none beyond ±8) plus an SSIM helper
-- [ ] T023 [US1] Add the US1 golden test in `tests/golden.rs` (directional-lit cube vs `tests/golden/<platform>/cube_directional.png`) and assert viewport containment — pixels outside the viewport are unchanged (SC-002)
+- [x] T022 [P] [US1] Implement golden-test infrastructure in `tests/golden.rs`: request a headless adapter (no surface), render a scene to an offscreen texture, read it back, and compare to a PNG using the FR-019 metric (≥99% pixels within ±2/255, none beyond ±8) plus an SSIM helper
+- [x] T023 [US1] Add the US1 golden test in `tests/golden.rs` (directional-lit cube vs `tests/golden/<platform>/cube_directional.png`) and assert viewport containment — pixels outside the viewport are unchanged (SC-002)
 
 **Checkpoint**: US1 is a fully functional, independently testable MVP — a visible lit frame.
 
@@ -96,7 +96,7 @@ shading, and invalid data returns `EngineError` at `create_mesh`.
 - [x] T025 [P] [US2] Implement `builtin_mesh(Primitive::Sphere)` (UV sphere with generated normals + tangents) in `src/mesh.rs`
 - [x] T026 [P] [US2] Add unit tests for mesh validation errors (length mismatch, out-of-range index, non-triangle index count) — implemented as a `#[cfg(test)]` module in `src/mesh.rs` (validator is `pub(crate)`)
 - [ ] T027 [P] [US2] Add a golden test for a custom indexed mesh rendering equivalently to a built-in under the same scene (`tests/golden/<platform>/custom_mesh.png`) in `tests/golden.rs`
-- [ ] T028 [US2] Add a mesh-source toggle (built-in vs custom) to `examples/raw-wgpu/src/main.rs`
+- [x] T028 [US2] Add a mesh-source toggle (built-in vs custom) to `examples/raw-wgpu/src/main.rs`
 
 **Checkpoint**: Custom and built-in geometry both render; US1 still works.
 
@@ -154,9 +154,9 @@ widget bounds, with no engine code changes vs the raw-wgpu path.
 **Purpose**: Quality gates and constitution compliance.
 
 - [x] T039 [P] Run the Principle I dependency audit: `cargo tree -p nacre-engine -e normal` shows `wgpu`/`glam`/`bytemuck`/`log` plus two pure-Rust transitive `-sys` crates (`glutin_wgl_sys`, `renderdoc-sys`) that build without system packages and only load OS libraries at runtime — explicitly allowed by Principle I as clarified in constitution v1.1.0 (commit 0ccf198)
-- [ ] T040 [P] Add rustdoc to the public API (`Engine`, lifecycle, `Scene`, types) with a crate-level usage example in `src/lib.rs`; ensure `cargo doc` is clean
+- [x] T040 [P] Add rustdoc to the public API (`Engine`, lifecycle, `Scene`, types) with a crate-level usage example in `src/lib.rs`; ensure `cargo doc` is clean
 - [x] T041 [P] Ensure `cargo fmt --check` and `cargo clippy --all-targets -- -D warnings` are clean across the workspace
-- [ ] T042 Generate and commit the per-platform golden images and document the regeneration procedure (env var + review step) in `tests/golden.rs`
+- [x] T042 Generate and commit the per-platform golden images and document the regeneration procedure (env var + review step) in `tests/golden.rs`
 - [ ] T043 Validate quickstart scenarios 1–6 end to end and update `specs/001-render-pbr-mesh/quickstart.md` if any step drifted
 - [x] T044 [P] Add the `log` facade and emit a `warn!` when a scene exceeds `MAX_LIGHTS` instead of silently truncating, per Principle VI (done: commit 25df342)
 - [x] T045 [P] Enforce the Principle VI/VIII clippy lints (`print_stdout`, `print_stderr`, `dbg_macro`, `undocumented_unsafe_blocks` = deny) for the library in `src/lib.rs` (done: commit 25df342)

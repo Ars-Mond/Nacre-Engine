@@ -467,3 +467,119 @@ fn custom_mesh_renders() {
         "custom quad should be lit at center"
     );
 }
+
+// ---- Golden-image comparison (T042, FR-019) ----
+
+const REGEN_ENV: &str = "NACRE_REGENERATE_GOLDENS";
+
+/// Prefer a software adapter (WARP / lavapipe) so golden output is deterministic and
+/// machine-independent; fall back to any adapter (e.g. hardware Metal on macOS, which
+/// has no software backend).
+fn headless_deterministic() -> Option<(wgpu::Device, wgpu::Queue)> {
+    pollster::block_on(async {
+        let instance = wgpu::Instance::new(&wgpu::InstanceDescriptor::default());
+        let adapter = match request_adapter(&instance, true).await {
+            Some(a) => a,
+            None => request_adapter(&instance, false).await?,
+        };
+        adapter
+            .request_device(&wgpu::DeviceDescriptor {
+                label: Some("nacre-golden-device"),
+                required_features: wgpu::Features::empty(),
+                required_limits: wgpu::Limits::downlevel_defaults(),
+                memory_hints: wgpu::MemoryHints::default(),
+                experimental_features: wgpu::ExperimentalFeatures::default(),
+                trace: wgpu::Trace::Off,
+            })
+            .await
+            .ok()
+    })
+}
+
+fn golden_dir() -> std::path::PathBuf {
+    std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("tests")
+        .join("golden")
+        .join(std::env::consts::OS)
+}
+
+/// Compare RGBA8 `pixels` (`dim`x`dim`) against the per-OS golden PNG `name` using the
+/// FR-019 per-pixel tolerance, or (re)generate the golden when `NACRE_REGENERATE_GOLDENS`
+/// is set. A missing golden skips with a logged reason rather than failing, so a fresh
+/// platform stays green until its goldens are generated.
+fn compare_or_regenerate(name: &str, pixels: &[u8], dim: u32) {
+    let path = golden_dir().join(format!("{name}.png"));
+
+    if std::env::var(REGEN_ENV).is_ok() {
+        std::fs::create_dir_all(golden_dir()).expect("create golden dir");
+        image::RgbaImage::from_raw(dim, dim, pixels.to_vec())
+            .expect("rgba buffer")
+            .save(&path)
+            .expect("save golden");
+        eprintln!("[regen] wrote golden {}", path.display());
+        return;
+    }
+
+    let Ok(golden) = image::open(&path) else {
+        eprintln!(
+            "[skip] golden missing for this OS: {} (set {REGEN_ENV}=1 to create)",
+            path.display()
+        );
+        return;
+    };
+    let golden = golden.to_rgba8();
+    assert_eq!(
+        (golden.width(), golden.height()),
+        (dim, dim),
+        "golden size mismatch for {name}"
+    );
+
+    // FR-019: at least 99% of channel samples within +/-2, and none beyond +/-8.
+    let golden = golden.as_raw();
+    let mut within = 0usize;
+    let mut max_diff = 0u8;
+    for (&a, &b) in pixels.iter().zip(golden.iter()) {
+        let d = a.abs_diff(b);
+        max_diff = max_diff.max(d);
+        within += usize::from(d <= 2);
+    }
+    let ratio = within as f64 / pixels.len() as f64;
+    assert!(
+        max_diff <= 8,
+        "max channel diff {max_diff} exceeds 8 for golden {name}"
+    );
+    assert!(
+        ratio >= 0.99,
+        "only {:.2}% of channels within +/-2 for golden {name}",
+        ratio * 100.0
+    );
+}
+
+#[test]
+fn golden_cube_directional() {
+    let Some((device, queue)) = headless_deterministic() else {
+        return;
+    };
+    let mut engine = new_engine(&device, &queue);
+    let cube = engine.builtin_mesh(&device, Primitive::Cube);
+    let lights = [key_light()];
+    // A fixed (non-animated) transform keeps the output deterministic.
+    let scene = Scene {
+        camera: test_camera(),
+        mesh: cube,
+        transform: Mat4::from_rotation_y(0.6) * Mat4::from_rotation_x(0.3),
+        material: gray_material(),
+        lights: &lights,
+    };
+    let dim = 256;
+    let px = render_scene(
+        &device,
+        &queue,
+        &mut engine,
+        &scene,
+        dim,
+        full(dim),
+        wgpu::Color::BLACK,
+    );
+    compare_or_regenerate("cube_directional", &px, dim);
+}
