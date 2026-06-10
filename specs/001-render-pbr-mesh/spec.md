@@ -81,9 +81,10 @@ window.
    **When** the frame completes, **Then** only the pixels inside the viewport are
    affected and every pixel outside the viewport is left unchanged (the engine does
    not clear the whole target).
-4. **Given** a viewport whose size differs from the previous frame, **When**
-   `prepare()` runs, **Then** the engine creates or recreates its own depth buffer to
-   match the new viewport size and the frame renders with correct depth occlusion.
+4. **Given** a render target whose size differs from the previous frame, **When**
+   `prepare()` runs with the new target size, **Then** the engine creates or recreates its
+   own depth buffer to match the color target and the frame renders with correct depth
+   occlusion.
 
 ---
 
@@ -254,7 +255,9 @@ raw-wgpu reference integration.
 **Depth & frame correctness**
 
 - **FR-014**: The engine MUST create and own a depth buffer and MUST recreate it to
-  match the current viewport size when that size changes.
+  match the color target (render attachment) size when that size changes — the depth
+  attachment must match the color attachment, so it is sized to the target, not the draw
+  viewport.
 - **FR-015**: The engine MUST perform depth testing so that nearer surfaces correctly
   occlude farther surfaces.
 - **FR-016**: The engine MUST expose its owned depth-stencil texture view and the depth
@@ -306,8 +309,8 @@ raw-wgpu reference integration.
 - **Camera**: A view transform and a projection transform.
 - **Light**: An analytical light, directional or point, with color and intensity (plus
   direction or position by type).
-- **Depth buffer**: Engine-owned per-frame depth resource, sized to the viewport and
-  recreated on size change.
+- **Depth buffer**: Engine-owned depth resource, sized to the color target (to match the
+  color attachment) and recreated when the target size changes.
 
 ## Success Criteria *(mandatory)*
 
@@ -330,7 +333,7 @@ raw-wgpu reference integration.
   monotonically broadens the specular highlight, and increasing metallic from 0 to 1
   shifts the specular response toward the base color — both verifiable from reference
   renders.
-- **SC-006**: After a viewport size change, the very next frame renders with correct
+- **SC-006**: After a render-target size change, the very next frame renders with correct
   depth occlusion and no stale-depth artifacts.
 - **SC-007**: A scene with a directional light plus at least one point light shows each
   light's distinguishable, correctly located contribution.

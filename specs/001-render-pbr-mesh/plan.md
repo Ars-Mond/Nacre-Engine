@@ -22,7 +22,8 @@ tests under a tolerance metric.
 
 **Primary Dependencies** (library crate): `wgpu = 27` (pinned to match iced 0.14's
 `wgpu ^27` so the shared `Device`/`Queue`/types unify into one crate instance), `glam`
-(math), `bytemuck` (GPU data packing). No other runtime dependencies.
+(math), `bytemuck` (GPU data packing), and `log` (logging facade, required by Principle VI). No
+other runtime dependencies.
 
 **Dev/Example Dependencies** (isolated, never reach library consumers): `pollster` +
 `image` as library `[dev-dependencies]` for headless golden-image tests; `winit` +
@@ -62,8 +63,11 @@ lights (planned cap: 8); built-in cube and UV sphere primitives.
 | I. Pure Rust, zero native deps | Library deps are `wgpu` + `glam` + `bytemuck`, all pure Rust; `cargo build` works on a clean stable toolchain with no system C/C++ packages. The runtime GPU driver/adapter is a *runtime* requirement of GPU rendering, not a *build* dependency, so it does not breach Principle I. | PASS (dependency-tree audit is a Phase 0 research task) |
 | II. Cross-platform parity | CI matrix builds and tests on Windows, Linux, macOS; golden-image tests enforce FR-019 parity; no platform-specific code outside documented abstractions. | PASS (CI workflow added in implementation) |
 | III. Library, not I/O owner | Public API accepts `Device`, `Queue`, target format, and a render pass/target from the host; the engine creates no window, surface, event loop, or device. | PASS by design |
-| IV. Minimal explicit dependencies | Exactly three library dependencies, each justified; example-only deps (`winit`, `iced`) live in separate workspace member crates; test-only deps (`pollster`, `image`) are `[dev-dependencies]`. None reach library consumers. | PASS |
+| IV. Minimal explicit dependencies | Exactly four library dependencies (`wgpu`, `glam`, `bytemuck`, `log`), each justified; example-only deps (`winit`, `iced`) live in separate workspace member crates; test-only deps (`pollster`, `image`) are `[dev-dependencies]`. None reach library consumers. | PASS |
 | V. Integration first, API is contract | `update → prepare → render` is the public lifecycle; depth-view exposure and types are documented in `contracts/`; breaking changes follow SemVer major. | PASS |
+| VI. Structured logging discipline | All logging goes through the `log` facade; no `println!`/`eprintln!`/`dbg!` in library code; clippy `print_stdout`/`print_stderr`/`dbg_macro` denied; errors are propagated or logged (e.g. a `warn!` when lights exceed `MAX_LIGHTS`), never silently dropped. | PASS (enforced in `src/lib.rs`; commit 25df342) |
+| VII. Phase commit discipline | Each Spec Kit phase is committed via `/speckit-git-commit` before the next; one commit per phase. | PASS (followed throughout) |
+| VIII. Safe code discipline | No bare `.unwrap()` in library code; `.expect()` only with an invariant message; no `unsafe` in the engine; clippy `undocumented_unsafe_blocks` denied. | PASS (enforced in `src/lib.rs`; commit 25df342) |
 | Tech constraints | Shaders are WGSL only (`pbr.wgsl`); all code/comments/docs in English. | PASS |
 
 No violations. Complexity Tracking is empty.

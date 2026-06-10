@@ -31,14 +31,14 @@ member crates under `examples/` and golden fixtures under `tests/golden/`.
 
 **Purpose**: Workspace, dependencies, and project skeleton.
 
-- [ ] T001 Convert the root `Cargo.toml` to a Cargo workspace: keep `[package] nacre-engine` as a library, add `[workspace]` with members `examples/raw-wgpu` and `examples/iced-demo`, and set `autoexamples = false` so the root package does not scan `examples/` member crates, in `Cargo.toml`
-- [ ] T002 Declare dependencies in `Cargo.toml`: `wgpu = "27"`, `glam`, `bytemuck` (with `derive`); `[dev-dependencies]` `pollster`, `image`
-- [ ] T003 [P] Create the library module skeleton (declare `engine`, `scene`, `mesh`, `material`, `pipeline`, `uniforms`, `depth` modules and re-export the public API; keep `VERSION`) in `src/lib.rs`
-- [ ] T004 [P] Scaffold the raw-wgpu example member crate (`nacre-engine` path dep + `winit` + `pollster` + `wgpu = "27"`) in `examples/raw-wgpu/Cargo.toml` and a stub `examples/raw-wgpu/src/main.rs`
+- [x] T001 Convert the root `Cargo.toml` to a Cargo workspace: keep `[package] nacre-engine` as a library, add `[workspace]` with members `examples/raw-wgpu` and `examples/iced-demo`, and set `autoexamples = false` so the root package does not scan `examples/` member crates, in `Cargo.toml`
+- [x] T002 Declare dependencies in `Cargo.toml`: `wgpu = "27"`, `glam`, `bytemuck` (with `derive`); `[dev-dependencies]` `pollster`, `image`
+- [x] T003 [P] Create the library module skeleton (declare `engine`, `scene`, `mesh`, `material`, `pipeline`, `uniforms`, `depth` modules and re-export the public API; keep `VERSION`) in `src/lib.rs`
+- [x] T004 [P] Scaffold the raw-wgpu example member crate (`nacre-engine` path dep + `winit` + `pollster` + `wgpu = "27"`) in `examples/raw-wgpu/Cargo.toml` and a stub `examples/raw-wgpu/src/main.rs`
 - [ ] T005 [P] Scaffold the iced-demo example member crate (`nacre-engine` path dep + `iced = "0.14"`) in `examples/iced-demo/Cargo.toml` and a stub `examples/iced-demo/src/main.rs`
-- [ ] T006 [P] Add `.gitattributes` with `* text=auto eol=lf` for cross-platform line-ending parity (Principle II) in `.gitattributes`
+- [x] T006 [P] Add `.gitattributes` with `* text=auto eol=lf` for cross-platform line-ending parity (Principle II) in `.gitattributes`
 - [ ] T007 [P] Add the CI matrix (Windows/Linux/macOS) running `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`, and `cargo test`, provisioning software adapters (lavapipe on Linux, WARP on Windows) for headless tests, in `.github/workflows/ci.yml`
-- [ ] T008 [P] Remove the superseded placeholder example `examples/demo.rs` (replaced by `examples/raw-wgpu`)
+- [x] T008 [P] Remove the superseded placeholder example `examples/demo.rs` (replaced by `examples/raw-wgpu`)
 
 **Checkpoint**: `cargo build` succeeds for an empty workspace; example crates compile as stubs.
 
@@ -51,14 +51,14 @@ sampling yet (those belong to the stories that introduce them).
 
 **⚠️ CRITICAL**: No user story work can begin until this phase is complete.
 
-- [ ] T009 [P] Define host-facing input types `Viewport`, `Camera`, `Light` (enum), `Scene` in `src/scene.rs`
-- [ ] T010 [P] Define `Material` (scalars + optional `&wgpu::TextureView` maps) in `src/material.rs`
-- [ ] T011 [P] Define `Primitive` (enum), `MeshData`, `MeshHandle`, and the `Vertex` bytemuck struct with its 48-byte `wgpu::VertexBufferLayout` in `src/mesh.rs`
-- [ ] T012 [P] Define GPU uniform structs `CameraUniform`, `ModelUniform`, `LightStd`, `LightsUniform` (`MAX_LIGHTS = 8`), `MaterialUniform` (bytemuck `Pod`) in `src/uniforms.rs`
-- [ ] T013 [P] Implement depth-texture create/recreate sized to the viewport (`Depth32Float`, matching `sample_count`) in `src/depth.rs`
-- [ ] T014 Write the WGSL scaffold in `src/shaders/pbr.wgsl`: vertex stage (clip position, world normal/tangent, uv) and a fragment stage that outputs linear base color (no lighting yet); declare all bindings (group 0: camera/model/lights; group 1: material uniform + normal + AO + sampler)
-- [ ] T015 Implement bind group layouts (group 0, group 1) and the render pipeline (vertex layout + multisample state from `sample_count`, depth-stencil state, color target = `EngineConfig.target_format`) in `src/pipeline.rs`
-- [ ] T016 Define `EngineConfig`, `EngineError`, the `Engine` struct, `Engine::new` (build pipeline/layouts, uniform buffers, internal 1×1 placeholder normal/AO textures + sampler), and skeleton lifecycle methods `update`/`prepare`/`render` plus `depth_view()`/`depth_format()` in `src/engine.rs`
+- [x] T009 [P] Define host-facing input types `Viewport`, `Camera`, `Light` (enum), `Scene` in `src/scene.rs`
+- [x] T010 [P] Define `Material` (scalars + optional `&wgpu::TextureView` maps) in `src/material.rs`
+- [x] T011 [P] Define `Primitive` (enum), `MeshData`, `MeshHandle`, and the `Vertex` bytemuck struct with its 48-byte `wgpu::VertexBufferLayout` in `src/mesh.rs`
+- [x] T012 [P] Define GPU uniform structs `CameraUniform`, `ModelUniform`, `LightStd`, `LightsUniform` (`MAX_LIGHTS = 8`), `MaterialUniform` (bytemuck `Pod`) in `src/uniforms.rs`
+- [x] T013 [P] Implement depth-texture create/recreate sized to the viewport (`Depth32Float`, matching `sample_count`) in `src/depth.rs`
+- [x] T014 Write the WGSL scaffold in `src/shaders/pbr.wgsl`: vertex stage (clip position, world normal/tangent, uv) and a fragment stage that outputs linear base color (no lighting yet); declare all bindings (group 0: camera/model/lights; group 1: material uniform + normal + AO + sampler)
+- [x] T015 Implement bind group layouts (group 0, group 1) and the render pipeline (vertex layout + multisample state from `sample_count`, depth-stencil state, color target = `EngineConfig.target_format`) in `src/pipeline.rs`
+- [x] T016 Define `EngineConfig`, `EngineError`, the `Engine` struct, `Engine::new` (build pipeline/layouts, uniform buffers, internal 1×1 placeholder normal/AO textures + sampler), and skeleton lifecycle methods `update`/`prepare`/`render` plus `depth_view()`/`depth_format()` in `src/engine.rs`
 
 **Checkpoint**: the engine constructs and can clear-load a pass; foundation ready for stories.
 
@@ -72,10 +72,10 @@ directional light into the host's pass/viewport, depth-tested, without the engin
 **Independent Test**: Run `cargo run -p raw-wgpu` and see a directional-lit, depth-tested cube
 drawn into the host frame within the viewport; the engine creates no window/device.
 
-- [ ] T017 [US1] Implement `builtin_mesh(Primitive::Cube)` (generated normals + tangents) and the vertex/index buffer upload returning a `MeshHandle` in `src/mesh.rs`
-- [ ] T018 [US1] Implement the lifecycle bodies in `src/engine.rs`: `update(scene)` records state; `prepare(device, queue, viewport)` uploads camera/model/lights/material uniforms and ensures the depth texture matches the viewport; `render(pass, viewport)` sets pipeline, bind groups, viewport + scissor, and issues the indexed draw (no clear)
-- [ ] T019 [US1] Add the directional-light Cook-Torrance term to `src/shaders/pbr.wgsl` (GGX `D`, Smith-Schlick `G`, Schlick `F`, `F0 = mix(0.04, base_color, metallic)`, Lambert diffuse × `(1 - metallic)`, summed over directional lights; linear output)
-- [ ] T020 [US1] Implement the scalar-material path (bind placeholders for absent maps, `flags = 0`) so the frame renders from `base_color`/`metallic`/`roughness` in `src/material.rs`
+- [x] T017 [US1] Implement `builtin_mesh(Primitive::Cube)` (generated normals + tangents) and the vertex/index buffer upload returning a `MeshHandle` in `src/mesh.rs`
+- [x] T018 [US1] Implement the lifecycle bodies in `src/engine.rs`: `update(scene)` records state; `prepare(device, queue, viewport)` uploads camera/model/lights/material uniforms and ensures the depth texture matches the viewport; `render(pass, viewport)` sets pipeline, bind groups, viewport + scissor, and issues the indexed draw (no clear)
+- [x] T019 [US1] Add the directional-light Cook-Torrance term to `src/shaders/pbr.wgsl` (GGX `D`, Smith-Schlick `G`, Schlick `F`, `F0 = mix(0.04, base_color, metallic)`, Lambert diffuse × `(1 - metallic)`, summed over directional lights; linear output)
+- [x] T020 [US1] Implement the scalar-material path (bind placeholders for absent maps, `flags = 0`) so the frame renders from `base_color`/`metallic`/`roughness` in `src/material.rs`
 - [ ] T021 [US1] Implement the raw-wgpu reference integration in `examples/raw-wgpu/src/main.rs`: winit window + host adapter/device/queue/surface, engine creation, per-frame `update`/`prepare`/begin-pass-with-`depth_view()`/`render`/submit, directional light + camera + built-in cube, and resize handling (depth recreated via `prepare`)
 - [ ] T022 [P] [US1] Implement golden-test infrastructure in `tests/golden.rs`: request a headless adapter (no surface), render a scene to an offscreen texture, read it back, and compare to a PNG using the FR-019 metric (≥99% pixels within ±2/255, none beyond ±8) plus an SSIM helper
 - [ ] T023 [US1] Add the US1 golden test in `tests/golden.rs` (directional-lit cube vs `tests/golden/<platform>/cube_directional.png`) and assert viewport containment — pixels outside the viewport are unchanged (SC-002)
@@ -92,9 +92,9 @@ same path as built-ins.
 **Independent Test**: Swap the built-in cube for a hand-built `MeshData`; it renders with correct
 shading, and invalid data returns `EngineError` at `create_mesh`.
 
-- [ ] T024 [US2] Implement `create_mesh(device, &MeshData) -> Result<MeshHandle, EngineError>` with validation (non-empty, attribute length parity, `indices.len() % 3 == 0`, every index < vertex count) in `src/mesh.rs`
-- [ ] T025 [P] [US2] Implement `builtin_mesh(Primitive::Sphere)` (UV sphere with generated normals + tangents) in `src/mesh.rs`
-- [ ] T026 [P] [US2] Add unit tests for mesh validation errors (length mismatch, out-of-range index, non-triangle index count) in `tests/mesh_validation.rs`
+- [x] T024 [US2] Implement `create_mesh(device, &MeshData) -> Result<MeshHandle, EngineError>` with validation (non-empty, attribute length parity, `indices.len() % 3 == 0`, every index < vertex count) in `src/mesh.rs`
+- [x] T025 [P] [US2] Implement `builtin_mesh(Primitive::Sphere)` (UV sphere with generated normals + tangents) in `src/mesh.rs`
+- [x] T026 [P] [US2] Add unit tests for mesh validation errors (length mismatch, out-of-range index, non-triangle index count) — implemented as a `#[cfg(test)]` module in `src/mesh.rs` (validator is `pub(crate)`)
 - [ ] T027 [P] [US2] Add a golden test for a custom indexed mesh rendering equivalently to a built-in under the same scene (`tests/golden/<platform>/custom_mesh.png`) in `tests/golden.rs`
 - [ ] T028 [US2] Add a mesh-source toggle (built-in vs custom) to `examples/raw-wgpu/src/main.rs`
 
@@ -110,9 +110,9 @@ fallback.
 **Independent Test**: Rough dielectric vs smooth metal differ per the model (SC-005); a normal map
 adds detail, and omitting it falls back with no error.
 
-- [ ] T029 [US3] Add normal-map sampling + tangent-space normal reconstruction to `src/shaders/pbr.wgsl`, gated by the `has_normal_map` flag with geometric-normal fallback
-- [ ] T030 [US3] Add AO-map sampling gated by the `has_occlusion_map` flag and apply it to the lit result in `src/shaders/pbr.wgsl`
-- [ ] T031 [US3] Wire `Material.normal_map`/`occlusion_map` (`Option<&TextureView>`) into the material bind group — bind the host view or the 1×1 placeholder and set `flags` accordingly — in `src/material.rs` and `src/engine.rs`
+- [x] T029 [US3] Add normal-map sampling + tangent-space normal reconstruction to `src/shaders/pbr.wgsl`, gated by the `has_normal_map` flag with geometric-normal fallback
+- [x] T030 [US3] Add AO-map sampling gated by the `has_occlusion_map` flag and apply it to the lit result in `src/shaders/pbr.wgsl`
+- [x] T031 [US3] Wire `Material.normal_map`/`occlusion_map` (`Option<&TextureView>`) into the material bind group — bind the host view or the 1×1 placeholder and set `flags` accordingly — in `src/material.rs` and `src/engine.rs`
 - [ ] T032 [P] [US3] Add golden tests for material response (rough dielectric vs smooth metal, SC-005) and normal-map on/off (`tests/golden/<platform>/material_*.png`) in `tests/golden.rs`
 
 **Checkpoint**: Full material control works; earlier stories still pass.
@@ -126,8 +126,8 @@ adds detail, and omitting it falls back with no error.
 **Independent Test**: A directional light plus two point lights each contribute visibly (SC-007);
 an empty light slice renders black without error.
 
-- [ ] T033 [US4] Add the point-light term (inverse-square falloff + `range` cutoff) to `src/shaders/pbr.wgsl` and iterate `0..count` lights, branching on `kind` for directional vs point
-- [ ] T034 [US4] Pack a `&[Light]` (0..=`MAX_LIGHTS`) into `LightsUniform` with `count`, clamping with a warning when the slice exceeds `MAX_LIGHTS`, in `src/engine.rs`
+- [x] T033 [US4] Add the point-light term (inverse-square falloff + `range` cutoff) to `src/shaders/pbr.wgsl` and iterate `0..count` lights, branching on `kind` for directional vs point
+- [x] T034 [US4] Pack a `&[Light]` (0..=`MAX_LIGHTS`) into `LightsUniform` with `count`, clamping with a warning when the slice exceeds `MAX_LIGHTS`, in `src/engine.rs`
 - [ ] T035 [P] [US4] Add a golden test for directional + two point lights (`tests/golden/<platform>/multi_light.png`) and assert an empty light slice renders without error in `tests/golden.rs`
 
 **Checkpoint**: Multi-light scenes work; earlier stories still pass.
@@ -153,11 +153,13 @@ widget bounds, with no engine code changes vs the raw-wgpu path.
 
 **Purpose**: Quality gates and constitution compliance.
 
-- [ ] T039 [P] Run the Principle I dependency audit: confirm `cargo tree -p nacre-engine` contains only `wgpu`/`glam`/`bytemuck` (+ their pure-Rust transitive deps) and no `*-sys` crate; record the result in the PR
+- [x] T039 [P] Run the Principle I dependency audit: `cargo tree -p nacre-engine -e normal` shows `wgpu`/`glam`/`bytemuck`/`log` plus two pure-Rust transitive `-sys` crates (`glutin_wgl_sys`, `renderdoc-sys`) that build without system packages and only load OS libraries at runtime — explicitly allowed by Principle I as clarified in constitution v1.1.0 (commit 0ccf198)
 - [ ] T040 [P] Add rustdoc to the public API (`Engine`, lifecycle, `Scene`, types) with a crate-level usage example in `src/lib.rs`; ensure `cargo doc` is clean
-- [ ] T041 [P] Ensure `cargo fmt --check` and `cargo clippy --all-targets -- -D warnings` are clean across the workspace
+- [x] T041 [P] Ensure `cargo fmt --check` and `cargo clippy --all-targets -- -D warnings` are clean across the workspace
 - [ ] T042 Generate and commit the per-platform golden images and document the regeneration procedure (env var + review step) in `tests/golden.rs`
 - [ ] T043 Validate quickstart scenarios 1–6 end to end and update `specs/001-render-pbr-mesh/quickstart.md` if any step drifted
+- [x] T044 [P] Add the `log` facade and emit a `warn!` when a scene exceeds `MAX_LIGHTS` instead of silently truncating, per Principle VI (done: commit 25df342)
+- [x] T045 [P] Enforce the Principle VI/VIII clippy lints (`print_stdout`, `print_stderr`, `dbg_macro`, `undocumented_unsafe_blocks` = deny) for the library in `src/lib.rs` (done: commit 25df342)
 
 ---
 

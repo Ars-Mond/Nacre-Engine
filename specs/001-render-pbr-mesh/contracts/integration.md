@@ -28,7 +28,7 @@ let mesh = engine.builtin_mesh(&device, Primitive::Cube);
 
 // per frame
 engine.update(&scene_using(mesh));
-engine.prepare(&device, &queue, viewport);
+engine.prepare(&device, &queue, (width, height)); // color-attachment (surface) size
 
 let mut encoder = device.create_command_encoder(&Default::default());
 {
@@ -62,7 +62,7 @@ impl shader::Primitive for NacrePrimitive {
     fn prepare(&self, device, queue, format, storage, bounds, viewport) {
         // ensure an Engine exists in `storage`, then:
         engine.update(&self.scene);
-        engine.prepare(device, queue, viewport_from(bounds));
+        engine.prepare(device, queue, target_size(viewport)); // full iced target size
     }
 
     fn render(&self, encoder, storage, target /* &TextureView */, clip_bounds) {
@@ -85,7 +85,7 @@ impl shader::Primitive for NacrePrimitive {
 
 ## Why the API is identical
 
-In both cases the engine call is `engine.prepare(device, queue, viewport)` then
+In both cases the engine call is `engine.prepare(device, queue, target_size)` then
 `engine.render(&mut pass, viewport)`. The only difference is the *site* of
 `begin_render_pass` (host vs adapter). The engine exposes `depth_view()`/`depth_format()` so
 either site can attach depth. No engine code branches on the host type, proving
@@ -96,5 +96,5 @@ host-agnosticism (FR-005, SC-003).
 - [ ] Color attachment format + sample count equal `EngineConfig`.
 - [ ] Color attachment uses `LoadOp::Load` (engine never clears the whole target).
 - [ ] Depth attachment is `engine.depth_view()` with `engine.depth_format()`.
-- [ ] `prepare()` is called every frame and after any viewport size change.
+- [ ] `prepare()` is called every frame and after any target (color-attachment) size change.
 - [ ] The engine and host share one `wgpu` crate instance (version match).

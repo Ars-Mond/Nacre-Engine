@@ -41,8 +41,12 @@ decisions that shape the design, with rationale and rejected alternatives.
 
 ## 3. Depth buffer ownership and attachment (FR-016)
 
-- **Decision**: The engine owns a depth texture sized to the viewport, recreated on size
-  change, and exposes `depth_view()` and `depth_format()`. The pass opener attaches it.
+- **Decision**: The engine owns a depth texture sized to the **color target** (the color
+  attachment), recreated when the target size changes, and exposes `depth_view()` and
+  `depth_format()`. The pass opener attaches it. (Implementation note: wgpu requires the depth
+  and color attachments to share dimensions, so `prepare(target_size)` takes the
+  color-attachment size; the draw viewport is applied only via `set_viewport`/scissor in
+  `render`.)
 - **Rationale**: wgpu fixes a render pass's attachments at `begin_render_pass`. Since the host
   begins the pass in the raw-wgpu case, the host must attach the engine's depth view there; in
   iced, the engine's Primitive adapter begins the pass and attaches it. The public

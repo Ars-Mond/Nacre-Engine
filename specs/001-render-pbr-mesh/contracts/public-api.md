@@ -93,14 +93,16 @@ impl Engine {
     /// Phase 1 — record the scene to draw this frame (CPU-side; marks state dirty).
     pub fn update(&mut self, scene: &Scene);
 
-    /// Phase 2 — upload uniforms, (re)create the depth buffer for `viewport`,
-    /// and refresh the material bind group. Safe to call when the viewport size changes.
-    pub fn prepare(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, viewport: Viewport);
+    /// Phase 2 — upload uniforms, (re)create the depth buffer to match the color
+    /// target, and refresh the material bind group. `target_size` is the host color
+    /// attachment size in pixels; the engine's depth attachment MUST match it (a wgpu
+    /// requirement), so depth is sized to the target, not the draw viewport.
+    pub fn prepare(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, target_size: (u32, u32));
 
     /// Phase 3 — encode the draw into a render pass the caller has begun, clipped to
-    /// `viewport` via viewport + scissor. Does NOT clear or touch pixels outside the
+    /// `viewport` via set_viewport + scissor. Does NOT clear or touch pixels outside the
     /// viewport. The pass MUST have been begun with `depth_view()` as its depth attachment.
-    pub fn render<'p>(&'p self, pass: &mut wgpu::RenderPass<'p>, viewport: Viewport);
+    pub fn render(&self, pass: &mut wgpu::RenderPass<'_>, viewport: Viewport);
 
     // ---- depth exposure (FR-016) ----
 
@@ -122,7 +124,7 @@ impl Engine {
    `depth_format()`); `render` assumes that attachment is present. Color attachment format and
    sample count MUST match `EngineConfig`.
 4. **Lifecycle order**: `update` → `prepare` → `render` per frame. `prepare` must run after any
-   `update` and after any viewport size change; `render` must run inside an active pass.
+   `update` and after any change to the color-target size; `render` must run inside an active pass.
 5. **Stability**: this surface is the SemVer contract; breaking changes require a major bump.
 
 ## Lifecycle ordering (informative)
@@ -132,8 +134,8 @@ new(device, queue, config)
 create_mesh(...) / builtin_mesh(...)        // once per mesh
 loop each frame:
     update(&scene)
-    prepare(device, queue, viewport)
+    prepare(device, queue, target_size)   // (width, height) of the color attachment
     // caller begins a render pass with color = host target, depth = engine.depth_view()
-    render(&mut pass, viewport)
+    render(&mut pass, viewport)            // draw sub-rectangle (set_viewport + scissor)
     // caller ends the pass, submits, presents
 ```

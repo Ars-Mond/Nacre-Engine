@@ -22,15 +22,18 @@ The engine derives and exposes `depth_format()` = `Depth32Float` and a `depth_vi
 
 ### Viewport
 
-Passed to `prepare()` and `render()`.
+The draw sub-rectangle passed to `render()` (drives `set_viewport` + scissor).
 
 | Field | Type | Notes / Validation |
 |-------|------|--------------------|
 | `x`, `y` | `f32` | Top-left origin within the target. |
-| `width`, `height` | `f32` | Render area; drives depth-buffer size. Zero width/height ⇒ frame is a safe no-op (edge case). |
+| `width`, `height` | `f32` | Render area for `set_viewport`/scissor. Zero width/height ⇒ frame is a safe no-op (edge case). |
 | `min_depth`, `max_depth` | `f32` | Default 0.0 / 1.0. |
 
-`prepare()` (re)creates the depth texture when `ceil(width) × ceil(height)` changes.
+The depth buffer is sized to the **color target**, not this viewport: `prepare(device,
+queue, target_size)` takes the color-attachment `(width, height)` and (re)creates the depth
+texture when that size changes (a wgpu requirement that depth and color attachments share
+dimensions).
 
 ### Camera
 
@@ -154,10 +157,11 @@ textures used when a map is absent (research §8).
 ## Relationships & lifecycle state
 
 - `Engine` owns: the render pipeline + bind group layouts (built once), uniform buffers, the
-  depth texture (per viewport size), internal placeholder textures and sampler, and the set of
-  uploaded meshes (`MeshHandle` → buffers).
+  depth texture (per color-target size), internal placeholder textures and sampler, and the set
+  of uploaded meshes (`MeshHandle` → buffers).
 - `Scene` references a `MeshHandle` and borrows host `TextureView`s for material maps.
 - Per-frame flow: `update(scene)` records CPU state and marks dirty → `prepare(device, queue,
-  viewport)` uploads uniforms, ensures the depth texture matches the viewport, and updates the
-  material bind group → `render(pass, viewport)` sets the pipeline, bind groups, viewport, and
-  scissor, then issues the indexed draw. No pipeline or mesh creation happens in `render`.
+  target_size)` uploads uniforms, ensures the depth texture matches the color target, and
+  updates the material bind group → `render(pass, viewport)` sets the pipeline, bind groups,
+  viewport, and scissor, then issues the indexed draw. No pipeline or mesh creation happens in
+  `render`.
