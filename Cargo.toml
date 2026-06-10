@@ -9,6 +9,7 @@ autoexamples = false
 [dependencies]
 bytemuck = { version = "1.25.0", features = ["derive"] }
 glam = "0.33.1"
+log = "0.4.32"
 wgpu = "^27"
 
 [dev-dependencies]

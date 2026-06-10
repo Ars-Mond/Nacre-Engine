@@ -210,6 +210,12 @@ impl Engine {
             normal_matrix: glam::Mat4::from_mat3(normal_mat).to_cols_array_2d(),
         };
 
+        if scene.lights.len() > MAX_LIGHTS {
+            log::warn!(
+                "scene has {} lights but MAX_LIGHTS is {MAX_LIGHTS}; ignoring the extras",
+                scene.lights.len()
+            );
+        }
         let count = scene.lights.len().min(MAX_LIGHTS);
         let mut lights = [LightStd::default(); MAX_LIGHTS];
         for (slot, light) in lights.iter_mut().zip(scene.lights.iter()).take(count) {

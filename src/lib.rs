@@ -10,6 +10,14 @@
 //! Cook-Torrance BRDF. Shaders are authored in WGSL and run on every `wgpu`
 //! backend (DX12, Vulkan, Metal, GLES).
 
+// Constitution Principle VI/VIII enforcement for library code.
+#![deny(
+    clippy::print_stdout,
+    clippy::print_stderr,
+    clippy::dbg_macro,
+    clippy::undocumented_unsafe_blocks
+)]
+
 mod depth;
 mod engine;
 mod error;
