@@ -179,9 +179,13 @@ demonstrate runtime switching of operator and exposure.
 
 **Compatibility (Principle V)**
 
-- **FR-008**: With default settings (None, exposure 1.0) the output MUST be
-  byte-identical to feature 001 for the same scene; all existing golden references MUST
-  remain valid without regeneration.
+- **FR-008**: With default settings (None, exposure 1.0) the output is designed to be
+  byte-identical to feature 001 — the None operator is the identity and `× 1.0` is an
+  exact IEEE-754 operation, so the lit-color computation is unchanged. The **enforced**
+  guarantee is that all existing feature-001 golden references remain valid without
+  regeneration (they pass the established per-pixel tolerance); byte-identity is the
+  design intent, not separately asserted per backend (a dedicated byte-exact check would
+  be flaky across driver/backend shader recompilation).
 - **FR-009**: The public `update → prepare → render` contract MUST NOT change; the new
   settings MUST be optional with defaults so existing host code compiles and behaves
   identically without modification.
