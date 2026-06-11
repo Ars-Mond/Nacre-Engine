@@ -703,6 +703,222 @@ fn golden_multi_light() {
     compare_or_regenerate("multi_light", &px, dim);
 }
 
+// ---- glTF fixture scene (tests/fixtures/T_NacreEngine.glb) ----
+
+/// Fixed test mapping from glTF light intensity to engine intensity: 1:1. The fixture
+/// is authored with engine-scale values (point lights of 1.5), not photometric
+/// exports, so the identity mapping is the documented, stable choice for this golden.
+const GLTF_INTENSITY_SCALE: f32 = 1.0;
+
+struct GltfScene {
+    mesh: MeshData,
+    transform: Mat4,
+    base_color: Vec4,
+    metallic: f32,
+    roughness: f32,
+    camera: Camera,
+    lights: Vec<Light>,
+}
+
+fn fixture_path() -> std::path::PathBuf {
+    std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("tests")
+        .join("fixtures")
+        .join("T_NacreEngine.glb")
+}
+
+/// Load the first mesh primitive, the camera, and the punctual lights from the GLB.
+/// The fixture MUST contain tangents (the engine requires them and does not generate
+/// them); the camera aspect is overridden with `aspect` to match the render target.
+fn load_gltf_fixture(aspect: f32) -> GltfScene {
+    let path = fixture_path();
+    let (doc, buffers, _images) = gltf::import(&path).expect("import fixture GLB");
+    let gltf_scene = doc
+        .default_scene()
+        .or_else(|| doc.scenes().next())
+        .expect("fixture GLB has no scene");
+
+    let mut mesh: Option<(MeshData, Mat4, Vec4, f32, f32)> = None;
+    let mut cam: Option<(Mat4, f32, f32, Option<f32>)> = None;
+    let mut lights: Vec<Light> = Vec::new();
+
+    let mut stack: Vec<(gltf::Node, Mat4)> =
+        gltf_scene.nodes().map(|n| (n, Mat4::IDENTITY)).collect();
+    while let Some((node, parent)) = stack.pop() {
+        let world = parent * Mat4::from_cols_array_2d(&node.transform().matrix());
+
+        if let Some(m) = node.mesh() {
+            if mesh.is_none() {
+                let prim = m
+                    .primitives()
+                    .next()
+                    .expect("fixture mesh has no primitives");
+                let reader = prim.reader(|buffer| Some(&buffers[buffer.index()]));
+                let positions: Vec<[f32; 3]> = reader
+                    .read_positions()
+                    .expect("fixture mesh has no positions")
+                    .collect();
+                let normals: Vec<[f32; 3]> = reader
+                    .read_normals()
+                    .expect("fixture mesh has no normals")
+                    .collect();
+                let uvs: Vec<[f32; 2]> = reader
+                    .read_tex_coords(0)
+                    .expect("fixture mesh has no UVs (TEXCOORD_0)")
+                    .into_f32()
+                    .collect();
+                let tangents: Vec<[f32; 4]> = reader
+                    .read_tangents()
+                    .expect(
+                        "fixture mesh has no tangents — re-export the GLB with tangents; \
+                         the engine requires them and does not generate them (FR-007)",
+                    )
+                    .collect();
+                let indices: Vec<u32> = reader
+                    .read_indices()
+                    .expect("fixture mesh has no indices")
+                    .into_u32()
+                    .collect();
+                let pbr = prim.material().pbr_metallic_roughness();
+                mesh = Some((
+                    MeshData {
+                        positions,
+                        normals,
+                        uvs,
+                        tangents,
+                        indices,
+                    },
+                    world,
+                    Vec4::from(pbr.base_color_factor()),
+                    pbr.metallic_factor(),
+                    pbr.roughness_factor(),
+                ));
+            } else {
+                eprintln!(
+                    "[warn] fixture has more than one mesh; using the first (single-mesh scope, FR-008)"
+                );
+            }
+        }
+
+        if let Some(c) = node.camera()
+            && cam.is_none()
+        {
+            match c.projection() {
+                gltf::camera::Projection::Perspective(p) => {
+                    cam = Some((world, p.yfov(), p.znear(), p.zfar()));
+                }
+                gltf::camera::Projection::Orthographic(_) => {
+                    panic!("fixture camera is orthographic; only perspective is supported")
+                }
+            }
+        }
+
+        if let Some(l) = node.light() {
+            match l.kind() {
+                gltf::khr_lights_punctual::Kind::Directional => {
+                    lights.push(Light::Directional {
+                        // A glTF directional light shines along its node's -Z axis.
+                        direction: world.transform_vector3(Vec3::NEG_Z).normalize(),
+                        color: Vec3::from(l.color()),
+                        intensity: l.intensity() * GLTF_INTENSITY_SCALE,
+                    });
+                }
+                gltf::khr_lights_punctual::Kind::Point => {
+                    lights.push(Light::Point {
+                        position: world.transform_point3(Vec3::ZERO),
+                        color: Vec3::from(l.color()),
+                        intensity: l.intensity() * GLTF_INTENSITY_SCALE,
+                        range: l.range().unwrap_or(0.0),
+                    });
+                }
+                gltf::khr_lights_punctual::Kind::Spot { .. } => {
+                    eprintln!("[warn] fixture spot light skipped (unsupported light type)");
+                }
+            }
+        }
+
+        for child in node.children() {
+            stack.push((child, world));
+        }
+    }
+
+    let (mesh, transform, base_color, metallic, roughness) =
+        mesh.expect("fixture GLB contains no mesh");
+    let (cam_world, yfov, znear, zfar) = cam.expect("fixture GLB contains no camera");
+    assert!(
+        !lights.is_empty(),
+        "fixture GLB has no supported KHR_lights_punctual lights (directional/point)"
+    );
+    eprintln!(
+        "[fixture] {} verts / {} indices, base_color {:?}, metallic {}, roughness {}, {} light(s): {:?}",
+        mesh.positions.len(),
+        mesh.indices.len(),
+        base_color,
+        metallic,
+        roughness,
+        lights.len(),
+        lights
+    );
+
+    GltfScene {
+        mesh,
+        transform,
+        base_color,
+        metallic,
+        roughness,
+        camera: Camera {
+            view: cam_world.inverse(),
+            // Aspect is overridden to match the render target, per the test contract.
+            projection: Mat4::perspective_rh(yfov, aspect, znear, zfar.unwrap_or(100.0)),
+            position: cam_world.w_axis.truncate(),
+        },
+        lights,
+    }
+}
+
+#[test]
+fn golden_gltf_fixture() {
+    if !fixture_path().exists() {
+        eprintln!(
+            "[skip] glTF fixture missing: {} (place the GLB to enable this test)",
+            fixture_path().display()
+        );
+        return;
+    }
+    let Some((device, queue)) = headless_deterministic() else {
+        return;
+    };
+    let dim = 256;
+    let loaded = load_gltf_fixture(1.0); // square target => aspect 1.0
+    let mut engine = new_engine(&device, &queue);
+    let mesh = engine
+        .create_mesh(&device, &loaded.mesh)
+        .expect("fixture mesh failed engine validation");
+    let scene = Scene {
+        camera: loaded.camera,
+        mesh,
+        transform: loaded.transform,
+        material: Material {
+            base_color: loaded.base_color,
+            metallic: loaded.metallic,
+            roughness: loaded.roughness,
+            normal_map: None,
+            occlusion_map: None,
+        },
+        lights: &loaded.lights,
+    };
+    let px = render_scene(
+        &device,
+        &queue,
+        &mut engine,
+        &scene,
+        dim,
+        full(dim),
+        wgpu::Color::BLACK,
+    );
+    compare_or_regenerate("gltf_fixture", &px, dim);
+}
+
 /// Windowed mean SSIM (8x8 blocks) on luma, in `[0, 1]` — a standard-shaped structural
 /// similarity measure for the cross-platform golden equivalence check (FR-019).
 fn ssim(a: &[u8], b: &[u8], width: u32, height: u32) -> f64 {
@@ -767,7 +983,8 @@ fn ssim(a: &[u8], b: &[u8], width: u32, height: u32) -> f64 {
 /// skipped with a warning until those goldens are generated (via the update-golden CI job).
 #[test]
 fn golden_cross_platform_ssim() {
-    const SCENES: [&str; 4] = [
+    const SCENES: [&str; 5] = [
+        "gltf_fixture",
         "cube_directional",
         "custom_mesh",
         "material_metal",
