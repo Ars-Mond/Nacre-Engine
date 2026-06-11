@@ -13,7 +13,7 @@
 
 ## Requirement Completeness
 
-- [ ] No [NEEDS CLARIFICATION] markers remain
+- [x] No [NEEDS CLARIFICATION] markers remain
 - [x] Requirements are testable and unambiguous
 - [x] Success criteria are measurable
 - [x] Success criteria are technology-agnostic (no implementation details)
@@ -31,14 +31,10 @@
 
 ## Notes
 
-- **2 `[NEEDS CLARIFICATION]` markers remain, intentionally** — the requester asked to
-  flag genuine ambiguities rather than guess. Both pick a concrete formulation for an
-  operator whose variants produce visibly different output (and therefore different
-  goldens and viewer comparability):
-  - **FR-005** — which Reinhard variant (simple per-channel, luminance-based, or
-    extended with white point).
-  - **FR-006** — which ACES formulation (Narkowicz 2015 fit, Hill fit as in the Khronos
-    glTF Sample Viewer, or full RRT+ODT).
+- **Both `[NEEDS CLARIFICATION]` markers were resolved** in the 2026-06-12 clarification
+  session (see the spec's Clarifications section). All checklist items now pass.
+  - **FR-005** — Reinhard fixed to the simple per-channel `c / (1 + c)` formulation.
+  - **FR-006** — ACES fixed to the Hill fit (Khronos glTF Sample Viewer formulation).
 - **Domain vocabulary note**: HDR/tone-mapping terms (operator names, sRGB, golden
   references, the lifecycle) describe the product's contract surface for its technical
   user (an integrating developer), not hidden implementation choices.

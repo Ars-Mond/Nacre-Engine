@@ -21,6 +21,19 @@ existing integrations (the defaults reproduce feature-001 output byte for byte).
 
 The "user" throughout this specification is a **developer integrating the engine**.
 
+## Clarifications
+
+### Session 2026-06-12
+
+- Q: Which Reinhard formulation should the operator use? → A: Simple per-channel
+  `c / (1 + c)` — the classic real-time variant; cheapest, adds no public parameter.
+  Bright channels desaturate slightly toward white; hue preservation in the operator
+  set is covered by Khronos PBR Neutral. (FR-005)
+- Q: Which ACES formulation should the operator use? → A: The Hill fit (RRT+ODT
+  approximation with ACEScg input/output matrices), matching the Khronos glTF Sample
+  Viewer so the FR-014 by-eye comparison also exercises ACES, not only PBR Neutral.
+  (FR-006)
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Exposure control (Priority: P1)
@@ -155,16 +168,12 @@ demonstrate runtime switching of operator and exposure.
 - **FR-004**: The engine MUST provide exactly this fixed operator set: **None**
   (passthrough), **Reinhard**, **ACES (filmic)**, and **Khronos PBR Neutral**. The
   default MUST be None.
-- **FR-005**: The Reinhard operator MUST use a single documented formulation.
-  [NEEDS CLARIFICATION: which Reinhard variant — simple per-channel `c/(1+c)`,
-  luminance-based (scales RGB by `L/(1+L)/L`, preserving hue), or extended Reinhard
-  with a white point? The variants differ visibly in hue and highlight rolloff, which
-  changes the goldens and the documented look.]
-- **FR-006**: The ACES (filmic) operator MUST use a single documented formulation.
-  [NEEDS CLARIFICATION: which ACES — the Narkowicz 2015 analytic fit (common in
-  real-time engines), the Hill fit (used by the Khronos glTF Sample Viewer), or the
-  full RRT+ODT transform? This affects goldens and how closely output matches the
-  reference viewer.]
+- **FR-005**: The Reinhard operator MUST use the simple per-channel formulation
+  `c / (1 + c)` applied independently to each RGB channel. No additional parameter
+  (e.g. white point) is exposed.
+- **FR-006**: The ACES (filmic) operator MUST use the Hill fit — the RRT+ODT
+  approximation with ACEScg input/output matrices, as used by the Khronos glTF Sample
+  Viewer — so output is directly comparable with that reference viewer.
 - **FR-007**: The Khronos PBR Neutral operator MUST follow the published Khronos PBR
   Neutral specification.
 
