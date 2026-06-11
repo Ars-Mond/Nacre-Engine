@@ -1,23 +1,23 @@
 <!-- SPECKIT START -->
-## Active feature: 001-render-pbr-mesh
+## Active feature: 002-tonemap-exposure
 
-Plan: `specs/001-render-pbr-mesh/plan.md` (see also `spec.md`, `research.md`,
+Plan: `specs/002-tonemap-exposure/plan.md` (see also `spec.md`, `research.md`,
 `data-model.md`, `contracts/`, `quickstart.md`).
 
-**What**: Walking skeleton — render one metallic-roughness PBR mesh into a
-host-provided texture via the stable `update → prepare → render` lifecycle.
+**What**: Tone mapping + exposure — map the linear HDR lighting result into
+displayable range. Order: `lighting → × exposure → tone curve → sRGB target`; alpha
+untouched. Four fixed operators: None (default, = feature 001), Reinhard (`c/(1+c)`),
+ACES (Hill fit), Khronos PBR Neutral.
 
-**Stack**: Rust stable, edition 2024. Library deps: `wgpu = 27` (pinned to match
-iced 0.14's `wgpu ^27` so the shared Device/types unify), `glam`, `bytemuck`.
-Shaders: WGSL only. Example/test deps (`winit`, `iced`, `pollster`, `image`) are
-isolated in example member crates and `[dev-dependencies]`.
+**Key design**: additive only. Settings go through a new `Engine::set_tone_mapping`
+setter (default None / exposure 1.0), NOT a `Scene`/`EngineConfig` field — so existing
+host code compiles unmodified and the default path is byte-identical to feature 001
+(existing goldens stay valid). The `update → prepare → render` contract is unchanged
+(Principle V; ships as a SemVer minor). Implemented in `fs_main` + one group-0 uniform
+(binding 3); no new pass, target, or dependency.
 
-**Hard constraints** (constitution): engine never creates a window/surface/event
-loop/Device/Queue (Principle III); pure-Rust build, no system packages
-(Principle I); identical-within-tolerance output on Windows/Linux/macOS
-(Principle II). Engine owns/recreates the depth buffer and exposes `depth_view()`;
-the pass opener attaches it. Linear color into an sRGB target; no tone mapping.
-Material maps are host-created GPU textures.
+**Built on**: feature 001 (complete) — the engine, golden pipeline (per-OS + per-pixel ε
++ cross-OS SSIM, `UPDATE_GOLDEN`), both example integrations, and the 3-OS CI.
 
 For full technology, structure, and command details, read the plan above.
 <!-- SPECKIT END -->
