@@ -1,5 +1,6 @@
 # Normalize line endings to LF across platforms (constitution Principle II).
 * text=auto eol=lf
 
-# Reference golden images are binary.
+# Reference golden images and glTF fixtures are binary.
 *.png binary
+*.glb binary

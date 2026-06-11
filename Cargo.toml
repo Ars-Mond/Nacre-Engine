@@ -13,6 +13,7 @@ log = "0.4.32"
 wgpu = "^27"
 
 [dev-dependencies]
+gltf = { version = "1.4.1", features = ["KHR_lights_punctual"] }
 image = { version = "0.25", default-features = false, features = ["png"] }
 pollster = "0.4.0"
 
