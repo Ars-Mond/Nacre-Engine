@@ -34,9 +34,15 @@ struct Material {
     _pad: u32,
 };
 
+struct ToneMap {
+    exposure: f32,
+    op: u32,
+};
+
 @group(0) @binding(0) var<uniform> camera: Camera;
 @group(0) @binding(1) var<uniform> model: Model;
 @group(0) @binding(2) var<uniform> lights: Lights;
+@group(0) @binding(3) var<uniform> tonemap: ToneMap;
 
 @group(1) @binding(0) var<uniform> material: Material;
 @group(1) @binding(1) var normal_tex: texture_2d<f32>;
@@ -101,6 +107,68 @@ fn geometry_smith(n_dot_v: f32, n_dot_l: f32, roughness: f32) -> f32 {
 
 fn fresnel_schlick(cos_theta: f32, f0: vec3<f32>) -> vec3<f32> {
     return f0 + (vec3<f32>(1.0) - f0) * pow(clamp(1.0 - cos_theta, 0.0, 1.0), 5.0);
+}
+
+// ---- Tone mapping (feature 002) ----
+
+const TM_REINHARD: u32 = 1u;
+const TM_ACES: u32 = 2u;
+const TM_PBR_NEUTRAL: u32 = 3u;
+
+fn tm_reinhard(c: vec3<f32>) -> vec3<f32> {
+    return c / (1.0 + c);
+}
+
+// ACES filmic — Stephen Hill RRT+ODT fit (Khronos glTF Sample Viewer). Matrices are
+// column-major (sRGB/linear <-> ACEScg).
+fn tm_aces(c: vec3<f32>) -> vec3<f32> {
+    let m_in = mat3x3<f32>(
+        vec3<f32>(0.59719, 0.07600, 0.02840),
+        vec3<f32>(0.35458, 0.90834, 0.13383),
+        vec3<f32>(0.04823, 0.01566, 0.83777),
+    );
+    let m_out = mat3x3<f32>(
+        vec3<f32>(1.60475, -0.10208, -0.00327),
+        vec3<f32>(-0.53108, 1.10813, -0.07276),
+        vec3<f32>(-0.07367, -0.00605, 1.07602),
+    );
+    let v = m_in * c;
+    let a = v * (v + 0.0245786) - 0.000090537;
+    let b = v * (0.983729 * v + 0.4329510) + 0.238081;
+    return clamp(m_out * (a / b), vec3<f32>(0.0), vec3<f32>(1.0));
+}
+
+// Khronos PBR Neutral tone mapper (reference implementation).
+fn tm_pbr_neutral(color: vec3<f32>) -> vec3<f32> {
+    let start_compression = 0.8 - 0.04;
+    let desaturation = 0.15;
+    let x = min(color.r, min(color.g, color.b));
+    var offset = 0.04;
+    if (x < 0.08) {
+        offset = x - 6.25 * x * x;
+    }
+    var c = color - offset;
+    let peak = max(c.r, max(c.g, c.b));
+    if (peak < start_compression) {
+        return c;
+    }
+    let d = 1.0 - start_compression;
+    let new_peak = 1.0 - d * d / (peak + d - start_compression);
+    c = c * (new_peak / peak);
+    let g = 1.0 - 1.0 / (desaturation * (peak - new_peak) + 1.0);
+    return mix(c, vec3<f32>(new_peak), g);
+}
+
+// op 0 = None (identity); see ToneMapOperator in src/tonemap.rs.
+fn tone_map(c: vec3<f32>, op: u32) -> vec3<f32> {
+    if (op == TM_REINHARD) {
+        return tm_reinhard(c);
+    } else if (op == TM_ACES) {
+        return tm_aces(c);
+    } else if (op == TM_PBR_NEUTRAL) {
+        return tm_pbr_neutral(c);
+    }
+    return c;
 }
 
 @fragment
@@ -171,5 +239,7 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     }
 
     let color = lo * ao;
-    return vec4<f32>(color, material.base_color.a);
+    // feature 002: lighting -> x exposure -> tone curve -> sRGB target; alpha untouched.
+    let mapped = tone_map(color * tonemap.exposure, tonemap.op);
+    return vec4<f32>(mapped, material.base_color.a);
 }

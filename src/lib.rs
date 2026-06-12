@@ -70,6 +70,7 @@ mod material;
 mod mesh;
 mod pipeline;
 mod scene;
+mod tonemap;
 mod uniforms;
 
 pub use engine::{Engine, EngineConfig};
@@ -77,6 +78,7 @@ pub use error::EngineError;
 pub use material::Material;
 pub use mesh::{MeshData, MeshHandle, Primitive};
 pub use scene::{Camera, Light, Scene, Viewport};
+pub use tonemap::{ToneMapOperator, ToneMapping};
 pub use uniforms::MAX_LIGHTS;
 
 // Re-export the exact dependency versions so hosts share one crate instance.

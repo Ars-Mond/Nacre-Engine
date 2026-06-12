@@ -7,9 +7,10 @@ use crate::error::EngineError;
 use crate::mesh::{self, GpuMesh, MeshData, MeshHandle, Primitive};
 use crate::pipeline::{self, Pipelines};
 use crate::scene::{Light, Scene, Viewport};
+use crate::tonemap::ToneMapping;
 use crate::uniforms::{
     CameraUniform, FLAG_HAS_NORMAL_MAP, FLAG_HAS_OCCLUSION_MAP, LIGHT_DIRECTIONAL, LIGHT_POINT,
-    LightStd, LightsUniform, MAX_LIGHTS, MaterialUniform, ModelUniform,
+    LightStd, LightsUniform, MAX_LIGHTS, MaterialUniform, ModelUniform, ToneMapUniform,
 };
 use glam::Mat3;
 use wgpu::util::DeviceExt;
@@ -37,6 +38,7 @@ pub struct Engine {
     model_buf: wgpu::Buffer,
     lights_buf: wgpu::Buffer,
     material_buf: wgpu::Buffer,
+    tonemap_buf: wgpu::Buffer,
     bind_group_frame: wgpu::BindGroup,
     bind_group_material: wgpu::BindGroup,
 
@@ -52,6 +54,7 @@ pub struct Engine {
     normal_view: Option<wgpu::TextureView>,
     ao_view: Option<wgpu::TextureView>,
     material_dirty: bool,
+    tonemap: ToneMapping,
 }
 
 impl Engine {
@@ -68,6 +71,7 @@ impl Engine {
         let model_buf = uniform_buffer(device, "nacre-model", size_of::<ModelUniform>());
         let lights_buf = uniform_buffer(device, "nacre-lights", size_of::<LightsUniform>());
         let material_buf = uniform_buffer(device, "nacre-material", size_of::<MaterialUniform>());
+        let tonemap_buf = uniform_buffer(device, "nacre-tonemap", size_of::<ToneMapUniform>());
 
         let bind_group_frame = device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("nacre-frame-bg"),
@@ -84,6 +88,10 @@ impl Engine {
                 wgpu::BindGroupEntry {
                     binding: 2,
                     resource: lights_buf.as_entire_binding(),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 3,
+                    resource: tonemap_buf.as_entire_binding(),
                 },
             ],
         });
@@ -123,6 +131,7 @@ impl Engine {
             model_buf,
             lights_buf,
             material_buf,
+            tonemap_buf,
             bind_group_frame,
             bind_group_material,
             depth: None,
@@ -151,6 +160,7 @@ impl Engine {
             normal_view: None,
             ao_view: None,
             material_dirty: false,
+            tonemap: ToneMapping::default(),
         }
     }
 
@@ -168,6 +178,14 @@ impl Engine {
     pub fn builtin_mesh(&mut self, device: &wgpu::Device, primitive: Primitive) -> MeshHandle {
         let data = mesh::primitive_data(primitive);
         self.upload_mesh(device, &data)
+    }
+
+    /// Set the tone-mapping operator and exposure for subsequent frames. Safe to call at
+    /// any time, including between frames; the change takes effect on the next
+    /// [`Engine::prepare`]. The default is [`ToneMapping::default`] — operator `None`,
+    /// exposure 1.0 — which is byte-identical to feature 001.
+    pub fn set_tone_mapping(&mut self, settings: ToneMapping) {
+        self.tonemap = settings;
     }
 
     fn upload_mesh(&mut self, device: &wgpu::Device, data: &MeshData) -> MeshHandle {
@@ -280,6 +298,12 @@ impl Engine {
             0,
             bytemuck::bytes_of(&self.material_uniform),
         );
+        let tonemap_uniform = ToneMapUniform {
+            exposure: sanitize_exposure(self.tonemap.exposure),
+            operator: self.tonemap.operator.tag(),
+            _pad: [0; 2],
+        };
+        queue.write_buffer(&self.tonemap_buf, 0, bytemuck::bytes_of(&tonemap_uniform));
 
         if self.material_dirty {
             let normal = self
@@ -375,6 +399,19 @@ fn light_to_std(light: &Light) -> LightStd {
             range,
             _pad: 0.0,
         },
+    }
+}
+
+/// Replace a non-finite or negative exposure with 1.0 (with a logged warning) so the
+/// shader only ever sees a finite, non-negative multiplier. `0.0` is valid.
+fn sanitize_exposure(exposure: f32) -> f32 {
+    if exposure.is_finite() && exposure >= 0.0 {
+        exposure
+    } else {
+        log::warn!(
+            "tone-mapping exposure {exposure} is invalid (non-finite or negative); using 1.0"
+        );
+        1.0
     }
 }
 

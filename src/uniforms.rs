@@ -60,6 +60,16 @@ pub(crate) struct MaterialUniform {
     pub _pad: u32,
 }
 
+#[repr(C)]
+#[derive(Clone, Copy, Pod, Zeroable)]
+pub(crate) struct ToneMapUniform {
+    /// Sanitized linear exposure multiplier (applied before the curve).
+    pub exposure: f32,
+    /// `ToneMapOperator` tag (0 None, 1 Reinhard, 2 ACES, 3 Khronos PBR Neutral).
+    pub operator: u32,
+    pub _pad: [u32; 2],
+}
+
 impl Default for LightStd {
     fn default() -> Self {
         Self {

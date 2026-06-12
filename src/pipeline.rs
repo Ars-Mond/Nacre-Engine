@@ -46,6 +46,7 @@ pub(crate) fn build(
             uniform(0, wgpu::ShaderStages::VERTEX_FRAGMENT),
             uniform(1, wgpu::ShaderStages::VERTEX_FRAGMENT),
             uniform(2, wgpu::ShaderStages::FRAGMENT),
+            uniform(3, wgpu::ShaderStages::FRAGMENT),
         ],
     });
 
