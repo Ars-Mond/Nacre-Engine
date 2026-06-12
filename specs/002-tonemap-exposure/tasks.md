@@ -129,7 +129,7 @@ cores; then exercise operator/exposure switching in each.
 - [x] T023 [P] Add rustdoc for `ToneMapOperator`, `ToneMapping`, and `Engine::set_tone_mapping` (pipeline order + defaults + sanitization note); ensure `cargo doc` is clean, in `src/tonemap.rs` and `src/engine.rs`
 - [ ] T024 [P] Perform the manual Khronos glTF Sample Viewer comparison (FR-014: `T_NacreEngine.glb`, Khronos PBR Neutral, exposure 1.0, punctual lighting, IBL off) and record the result in `specs/002-tonemap-exposure/quickstart.md` — **deferred**: manual GUI step, needs a desktop session with the Khronos glTF Sample Viewer (not runnable in this headless environment)
 - [x] T025 [P] Ensure `cargo fmt --all -- --check`, `cargo clippy --workspace --all-targets -- -D warnings`, and `cargo test --workspace` are green
-- [ ] T026 Dispatch the update-golden CI job to produce the Linux/macOS operator goldens and commit the uploaded PNG artifacts under `tests/golden/<os>/` (activates cross-OS SSIM for the new scenes) — **deferred**: requires the update-golden CI job on Linux/macOS runners (Windows goldens committed in T018)
+- [x] T026 Dispatch the update-golden CI job to produce the Linux/macOS operator goldens and commit the uploaded PNG artifacts under `tests/golden/<os>/` (activates cross-OS SSIM for the new scenes) — **done**: Linux/macOS goldens added; cross-OS SSIM now active for all 9 scenes
 
 ---
 
