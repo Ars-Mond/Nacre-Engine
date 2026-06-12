@@ -5,7 +5,8 @@
 use nacre_engine::glam::{Mat4, Vec3, Vec4};
 use nacre_engine::wgpu;
 use nacre_engine::{
-    Camera, Engine, EngineConfig, Light, Material, MeshData, Primitive, Scene, Viewport,
+    Camera, Engine, EngineConfig, Light, Material, MeshData, MeshHandle, Primitive, Scene,
+    ToneMapOperator, ToneMapping, Viewport,
 };
 
 const TARGET_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba8UnormSrgb;
@@ -983,12 +984,16 @@ fn ssim(a: &[u8], b: &[u8], width: u32, height: u32) -> f64 {
 /// skipped with a warning until those goldens are generated (via the update-golden CI job).
 #[test]
 fn golden_cross_platform_ssim() {
-    const SCENES: [&str; 5] = [
+    const SCENES: [&str; 9] = [
         "gltf_fixture",
         "cube_directional",
         "custom_mesh",
         "material_metal",
         "multi_light",
+        "tonemap_none",
+        "tonemap_reinhard",
+        "tonemap_aces",
+        "tonemap_pbr_neutral",
     ];
     const OSES: [&str; 3] = ["windows", "linux", "macos"];
 
@@ -1030,4 +1035,445 @@ fn golden_cross_platform_ssim() {
     if compared == 0 {
         eprintln!("[warn] cross-platform SSIM: no scene has >=2 per-OS goldens yet");
     }
+}
+
+// ---- Tone mapping and exposure (feature 002) ----
+
+fn mean_luminance(data: &[u8]) -> f64 {
+    let sum: u64 = data
+        .chunks_exact(4)
+        .map(|c| c[0] as u64 + c[1] as u64 + c[2] as u64)
+        .sum();
+    sum as f64 / (data.len() / 4) as f64
+}
+
+fn count_clipped_white(data: &[u8]) -> usize {
+    data.chunks_exact(4)
+        .filter(|c| c[0] == 255 && c[1] == 255 && c[2] == 255)
+        .count()
+}
+
+/// A bright, fixed scene that clips to flat white under the None operator — shared by
+/// the operator goldens and the clip-reduction / large-exposure tests.
+fn render_overbright(
+    device: &wgpu::Device,
+    queue: &wgpu::Queue,
+    engine: &mut Engine,
+    mesh: MeshHandle,
+    operator: ToneMapOperator,
+    exposure: f32,
+    dim: u32,
+) -> Vec<u8> {
+    let lights = [
+        Light::Directional {
+            direction: Vec3::new(-0.2, -0.3, -1.0),
+            color: Vec3::ONE,
+            intensity: 12.0,
+        },
+        Light::Point {
+            position: Vec3::new(1.2, 1.0, 1.5),
+            color: Vec3::ONE,
+            intensity: 18.0,
+            range: 10.0,
+        },
+    ];
+    let scene = Scene {
+        camera: test_camera(),
+        mesh,
+        transform: Mat4::from_rotation_y(0.6) * Mat4::from_rotation_x(0.3),
+        material: gray_material(),
+        lights: &lights,
+    };
+    engine.set_tone_mapping(ToneMapping { operator, exposure });
+    render_scene(
+        device,
+        queue,
+        engine,
+        &scene,
+        dim,
+        full(dim),
+        wgpu::Color::BLACK,
+    )
+}
+
+#[test]
+fn tonemap_exposure_scales_brightness() {
+    let Some((device, queue)) = headless() else {
+        return;
+    };
+    let mut engine = new_engine(&device, &queue);
+    let cube = engine.builtin_mesh(&device, Primitive::Cube);
+    let lights = [key_light()];
+    let scene = Scene {
+        camera: test_camera(),
+        mesh: cube,
+        transform: Mat4::IDENTITY,
+        material: gray_material(),
+        lights: &lights,
+    };
+    let dim = 256;
+    let mut render_at = |exposure: f32| {
+        engine.set_tone_mapping(ToneMapping {
+            operator: ToneMapOperator::None,
+            exposure,
+        });
+        render_scene(
+            &device,
+            &queue,
+            &mut engine,
+            &scene,
+            dim,
+            full(dim),
+            wgpu::Color::BLACK,
+        )
+    };
+
+    let low = mean_luminance(&render_at(0.5));
+    let mid = mean_luminance(&render_at(1.0));
+    let high = mean_luminance(&render_at(2.0));
+    let black = mean_luminance(&render_at(0.0));
+
+    assert!(
+        low < mid && mid < high,
+        "exposure must scale brightness: {low} < {mid} < {high}"
+    );
+    assert!(black < 1.0, "exposure 0.0 must be black, got mean {black}");
+}
+
+#[test]
+fn tonemap_exposure_sanitized() {
+    let Some((device, queue)) = headless() else {
+        return;
+    };
+    let mut engine = new_engine(&device, &queue);
+    let cube = engine.builtin_mesh(&device, Primitive::Cube);
+    let lights = [key_light()];
+    let scene = Scene {
+        camera: test_camera(),
+        mesh: cube,
+        transform: Mat4::IDENTITY,
+        material: gray_material(),
+        lights: &lights,
+    };
+    let dim = 256;
+    let mut render_at = |exposure: f32| {
+        engine.set_tone_mapping(ToneMapping {
+            operator: ToneMapOperator::None,
+            exposure,
+        });
+        render_scene(
+            &device,
+            &queue,
+            &mut engine,
+            &scene,
+            dim,
+            full(dim),
+            wgpu::Color::BLACK,
+        )
+    };
+
+    // Invalid exposure (NaN / negative / Inf) is sanitized to 1.0 (and logs a warning),
+    // so the frame is byte-for-byte the exposure-1.0 baseline.
+    let baseline = render_at(1.0);
+    for bad in [f32::NAN, -1.0, f32::INFINITY] {
+        assert_eq!(
+            render_at(bad),
+            baseline,
+            "exposure {bad} must sanitize to 1.0"
+        );
+    }
+}
+
+#[test]
+fn tonemap_large_exposure_is_finite() {
+    let Some((device, queue)) = headless() else {
+        return;
+    };
+    let mut engine = new_engine(&device, &queue);
+    let cube = engine.builtin_mesh(&device, Primitive::Cube);
+    let dim = 256;
+
+    // None: a huge exposure saturates the lit object to white (no NaN garbage).
+    let none = render_overbright(
+        &device,
+        &queue,
+        &mut engine,
+        cube,
+        ToneMapOperator::None,
+        1e6,
+        dim,
+    );
+    let c = pixel(&none, dim, dim / 2, dim / 2);
+    assert_eq!(
+        [c[0], c[1], c[2]],
+        [255, 255, 255],
+        "None at 1e6 should saturate to white, got {c:?}"
+    );
+
+    // ACES: a huge exposure stays bounded and renders a lit center (no NaN/Inf).
+    let aces = render_overbright(
+        &device,
+        &queue,
+        &mut engine,
+        cube,
+        ToneMapOperator::Aces,
+        1e6,
+        dim,
+    );
+    assert!(
+        luminance(pixel(&aces, dim, dim / 2, dim / 2)) > 0,
+        "ACES at 1e6 should render a lit center"
+    );
+}
+
+#[test]
+fn tonemap_preserves_alpha() {
+    let Some((device, queue)) = headless() else {
+        return;
+    };
+    let mut engine = new_engine(&device, &queue);
+    let cube = engine.builtin_mesh(&device, Primitive::Cube);
+    // Strong light so a non-None operator visibly changes RGB versus None.
+    let lights = [Light::Directional {
+        direction: Vec3::new(-0.2, -0.3, -1.0),
+        color: Vec3::ONE,
+        intensity: 10.0,
+    }];
+    let scene = Scene {
+        camera: test_camera(),
+        mesh: cube,
+        transform: Mat4::IDENTITY,
+        material: Material {
+            base_color: Vec4::new(0.8, 0.8, 0.8, 0.5), // semi-transparent
+            metallic: 0.0,
+            roughness: 0.5,
+            normal_map: None,
+            occlusion_map: None,
+        },
+        lights: &lights,
+    };
+    let dim = 256;
+    let mut render_op = |operator: ToneMapOperator| {
+        engine.set_tone_mapping(ToneMapping {
+            operator,
+            exposure: 1.0,
+        });
+        render_scene(
+            &device,
+            &queue,
+            &mut engine,
+            &scene,
+            dim,
+            full(dim),
+            wgpu::Color::BLACK,
+        )
+    };
+
+    let none = render_op(ToneMapOperator::None);
+    let aces = render_op(ToneMapOperator::Aces);
+    let (cx, cy) = (dim / 2, dim / 2);
+    let p_none = pixel(&none, dim, cx, cy);
+    let p_aces = pixel(&aces, dim, cx, cy);
+
+    assert_eq!(
+        p_none[3], p_aces[3],
+        "alpha must be unchanged by the operator"
+    );
+    assert!(
+        (120..=136).contains(&p_none[3]),
+        "alpha should be ~128 (base 0.5), got {}",
+        p_none[3]
+    );
+    assert_ne!(
+        [p_none[0], p_none[1], p_none[2]],
+        [p_aces[0], p_aces[1], p_aces[2]],
+        "the operator should change RGB"
+    );
+}
+
+#[test]
+fn tonemap_runtime_switching() {
+    let Some((device, queue)) = headless() else {
+        return;
+    };
+    let mut engine = new_engine(&device, &queue);
+    let cube = engine.builtin_mesh(&device, Primitive::Cube);
+    let lights = [key_light()];
+    let scene = Scene {
+        camera: test_camera(),
+        mesh: cube,
+        transform: Mat4::IDENTITY,
+        material: gray_material(),
+        lights: &lights,
+    };
+    let dim = 256;
+    let ops = [
+        ToneMapOperator::None,
+        ToneMapOperator::Reinhard,
+        ToneMapOperator::Aces,
+        ToneMapOperator::KhronosPbrNeutral,
+    ];
+    for i in 0..24 {
+        let operator = ops[i % ops.len()];
+        let exposure = 0.5 + (i as f32) * 0.1;
+        engine.set_tone_mapping(ToneMapping { operator, exposure });
+        let px = render_scene(
+            &device,
+            &queue,
+            &mut engine,
+            &scene,
+            dim,
+            full(dim),
+            wgpu::Color::BLACK,
+        );
+        assert!(
+            luminance(pixel(&px, dim, dim / 2, dim / 2)) > 0,
+            "frame {i} ({operator:?}, exposure {exposure}) should render a lit center"
+        );
+    }
+}
+
+#[test]
+fn tonemap_reduces_clipping() {
+    let Some((device, queue)) = headless_deterministic() else {
+        return;
+    };
+    let mut engine = new_engine(&device, &queue);
+    let cube = engine.builtin_mesh(&device, Primitive::Cube);
+    let dim = 256;
+
+    let none = render_overbright(
+        &device,
+        &queue,
+        &mut engine,
+        cube,
+        ToneMapOperator::None,
+        1.0,
+        dim,
+    );
+    let reinhard = render_overbright(
+        &device,
+        &queue,
+        &mut engine,
+        cube,
+        ToneMapOperator::Reinhard,
+        1.0,
+        dim,
+    );
+    let aces = render_overbright(
+        &device,
+        &queue,
+        &mut engine,
+        cube,
+        ToneMapOperator::Aces,
+        1.0,
+        dim,
+    );
+    let neutral = render_overbright(
+        &device,
+        &queue,
+        &mut engine,
+        cube,
+        ToneMapOperator::KhronosPbrNeutral,
+        1.0,
+        dim,
+    );
+
+    let clip_none = count_clipped_white(&none);
+    assert!(clip_none > 0, "the overbright scene must clip under None");
+    for (name, img) in [
+        ("reinhard", &reinhard),
+        ("aces", &aces),
+        ("pbr_neutral", &neutral),
+    ] {
+        let clip = count_clipped_white(img);
+        assert!(
+            clip < clip_none,
+            "{name} should clip fewer pixels than None ({clip} vs {clip_none})"
+        );
+    }
+
+    // The four operator outputs are mutually distinct.
+    let imgs = [&none, &reinhard, &aces, &neutral];
+    for i in 0..imgs.len() {
+        for j in (i + 1)..imgs.len() {
+            assert_ne!(imgs[i], imgs[j], "operator outputs {i} and {j} must differ");
+        }
+    }
+}
+
+#[test]
+fn golden_tonemap_none() {
+    let Some((device, queue)) = headless_deterministic() else {
+        return;
+    };
+    let mut engine = new_engine(&device, &queue);
+    let cube = engine.builtin_mesh(&device, Primitive::Cube);
+    let px = render_overbright(
+        &device,
+        &queue,
+        &mut engine,
+        cube,
+        ToneMapOperator::None,
+        1.0,
+        256,
+    );
+    compare_or_regenerate("tonemap_none", &px, 256);
+}
+
+#[test]
+fn golden_tonemap_reinhard() {
+    let Some((device, queue)) = headless_deterministic() else {
+        return;
+    };
+    let mut engine = new_engine(&device, &queue);
+    let cube = engine.builtin_mesh(&device, Primitive::Cube);
+    let px = render_overbright(
+        &device,
+        &queue,
+        &mut engine,
+        cube,
+        ToneMapOperator::Reinhard,
+        1.0,
+        256,
+    );
+    compare_or_regenerate("tonemap_reinhard", &px, 256);
+}
+
+#[test]
+fn golden_tonemap_aces() {
+    let Some((device, queue)) = headless_deterministic() else {
+        return;
+    };
+    let mut engine = new_engine(&device, &queue);
+    let cube = engine.builtin_mesh(&device, Primitive::Cube);
+    let px = render_overbright(
+        &device,
+        &queue,
+        &mut engine,
+        cube,
+        ToneMapOperator::Aces,
+        1.0,
+        256,
+    );
+    compare_or_regenerate("tonemap_aces", &px, 256);
+}
+
+#[test]
+fn golden_tonemap_pbr_neutral() {
+    let Some((device, queue)) = headless_deterministic() else {
+        return;
+    };
+    let mut engine = new_engine(&device, &queue);
+    let cube = engine.builtin_mesh(&device, Primitive::Cube);
+    let px = render_overbright(
+        &device,
+        &queue,
+        &mut engine,
+        cube,
+        ToneMapOperator::KhronosPbrNeutral,
+        1.0,
+        256,
+    );
+    compare_or_regenerate("tonemap_pbr_neutral", &px, 256);
 }

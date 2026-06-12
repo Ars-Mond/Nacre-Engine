@@ -15,10 +15,13 @@
 use nacre_engine::Primitive as Shape;
 use nacre_engine::glam::{Mat4, Vec3, Vec4};
 use nacre_engine::wgpu;
-use nacre_engine::{Camera, Engine, EngineConfig, Light, Material, MeshHandle, Scene, Viewport};
+use nacre_engine::{
+    Camera, Engine, EngineConfig, Light, Material, MeshHandle, Scene, ToneMapOperator, ToneMapping,
+    Viewport,
+};
 
 use iced::mouse;
-use iced::widget::shader;
+use iced::widget::{button, column, row, shader, text};
 use iced::{Element, Length, Rectangle};
 
 /// The engine GPU state, created once by iced and cached in its `Storage`. All
@@ -48,6 +51,8 @@ impl shader::Pipeline for EnginePipeline {
 #[derive(Debug, Clone, Copy)]
 struct CubePrimitive {
     angle: f32,
+    operator: ToneMapOperator,
+    exposure: f32,
 }
 
 impl shader::Primitive for CubePrimitive {
@@ -95,6 +100,10 @@ impl shader::Primitive for CubePrimitive {
             },
             lights: &lights,
         };
+        pipeline.engine.set_tone_mapping(ToneMapping {
+            operator: self.operator,
+            exposure: self.exposure,
+        });
         pipeline.engine.update(&scene);
         pipeline
             .engine
@@ -145,6 +154,8 @@ impl shader::Primitive for CubePrimitive {
 #[derive(Debug)]
 struct CubeProgram {
     angle: f32,
+    operator: ToneMapOperator,
+    exposure: f32,
 }
 
 impl<Message> shader::Program<Message> for CubeProgram {
@@ -157,21 +168,75 @@ impl<Message> shader::Program<Message> for CubeProgram {
         _cursor: mouse::Cursor,
         _bounds: Rectangle,
     ) -> Self::Primitive {
-        CubePrimitive { angle: self.angle }
+        CubePrimitive {
+            angle: self.angle,
+            operator: self.operator,
+            exposure: self.exposure,
+        }
     }
 }
 
 #[derive(Debug, Clone)]
-enum Message {}
+enum Message {
+    CycleOperator,
+    ExposureUp,
+    ExposureDown,
+}
 
-#[derive(Default)]
-struct App;
+struct App {
+    operator: ToneMapOperator,
+    exposure: f32,
+}
 
-fn update(_state: &mut App, _message: Message) {}
+impl Default for App {
+    fn default() -> Self {
+        Self {
+            operator: ToneMapOperator::None,
+            exposure: 1.0,
+        }
+    }
+}
 
-fn view(_state: &App) -> Element<'_, Message> {
-    shader(CubeProgram { angle: 0.6 })
-        .width(Length::Fill)
+fn update(state: &mut App, message: Message) {
+    match message {
+        Message::CycleOperator => {
+            state.operator = match state.operator {
+                ToneMapOperator::None => ToneMapOperator::Reinhard,
+                ToneMapOperator::Reinhard => ToneMapOperator::Aces,
+                ToneMapOperator::Aces => ToneMapOperator::KhronosPbrNeutral,
+                ToneMapOperator::KhronosPbrNeutral => ToneMapOperator::None,
+            };
+        }
+        Message::ExposureUp => state.exposure = (state.exposure * 1.25).clamp(0.05, 64.0),
+        Message::ExposureDown => state.exposure = (state.exposure * 0.8).clamp(0.05, 64.0),
+    }
+}
+
+fn view(state: &App) -> Element<'_, Message> {
+    let scene = shader(CubeProgram {
+        angle: 0.6,
+        operator: state.operator,
+        exposure: state.exposure,
+    })
+    .width(Length::Fill)
+    .height(Length::Fill);
+
+    let controls = row(vec![
+        button(text(format!("Operator: {:?}", state.operator)))
+            .on_press(Message::CycleOperator)
+            .into(),
+        button(text("Exposure -"))
+            .on_press(Message::ExposureDown)
+            .into(),
+        text(format!("exposure {:.2}", state.exposure)).into(),
+        button(text("Exposure +"))
+            .on_press(Message::ExposureUp)
+            .into(),
+    ])
+    .spacing(12)
+    .padding(8);
+
+    column(vec![scene.into(), controls.into()])
         .height(Length::Fill)
         .into()
 }
@@ -233,7 +298,11 @@ mod tests {
             &queue,
             wgpu::TextureFormat::Rgba8UnormSrgb,
         );
-        let primitive = CubePrimitive { angle: 0.3 };
+        let primitive = CubePrimitive {
+            angle: 0.3,
+            operator: ToneMapOperator::Aces,
+            exposure: 1.5,
+        };
         let viewport = shader::Viewport::with_physical_size(iced::Size::new(256, 256), 1.0);
         let bounds = Rectangle {
             x: 0.0,

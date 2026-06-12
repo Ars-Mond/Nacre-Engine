@@ -24,7 +24,8 @@ use std::time::Instant;
 use nacre_engine::glam::{Mat4, Vec3, Vec4};
 use nacre_engine::wgpu;
 use nacre_engine::{
-    Camera, Engine, EngineConfig, Light, Material, MeshData, MeshHandle, Primitive, Scene, Viewport,
+    Camera, Engine, EngineConfig, Light, Material, MeshData, MeshHandle, Primitive, Scene,
+    ToneMapOperator, ToneMapping, Viewport,
 };
 
 use winit::application::ApplicationHandler;
@@ -38,6 +39,8 @@ use winit::window::{Window, WindowId};
 enum RenderMsg {
     Resize(PhysicalSize<u32>),
     CycleMesh,
+    CycleToneMap,
+    ScaleExposure(f32),
     Exit,
 }
 
@@ -51,6 +54,7 @@ struct State {
     /// Built-in cube, built-in sphere, and a custom mesh — cycled with Space.
     meshes: Vec<MeshHandle>,
     active: usize,
+    tonemap: ToneMapping,
     start: Instant,
 }
 
@@ -125,6 +129,7 @@ impl State {
             engine,
             meshes: vec![cube, sphere, custom],
             active: 0,
+            tonemap: ToneMapping::default(),
             start: Instant::now(),
         }
     }
@@ -139,6 +144,21 @@ impl State {
 
     fn cycle_mesh(&mut self) {
         self.active = (self.active + 1) % self.meshes.len();
+    }
+
+    fn cycle_tonemap(&mut self) {
+        self.tonemap.operator = match self.tonemap.operator {
+            ToneMapOperator::None => ToneMapOperator::Reinhard,
+            ToneMapOperator::Reinhard => ToneMapOperator::Aces,
+            ToneMapOperator::Aces => ToneMapOperator::KhronosPbrNeutral,
+            ToneMapOperator::KhronosPbrNeutral => ToneMapOperator::None,
+        };
+        println!("tone-map operator: {:?}", self.tonemap.operator);
+    }
+
+    fn scale_exposure(&mut self, factor: f32) {
+        self.tonemap.exposure = (self.tonemap.exposure * factor).clamp(0.05, 64.0);
+        println!("exposure: {:.3}", self.tonemap.exposure);
     }
 
     fn render(&mut self) {
@@ -177,6 +197,7 @@ impl State {
             lights: &lights,
         };
 
+        self.engine.set_tone_mapping(self.tonemap);
         self.engine.update(&scene);
         self.engine.prepare(
             &self.device,
@@ -256,6 +277,8 @@ fn render_loop(mut state: State, rx: Receiver<RenderMsg>) {
             match rx.try_recv() {
                 Ok(RenderMsg::Resize(size)) => state.resize(size),
                 Ok(RenderMsg::CycleMesh) => state.cycle_mesh(),
+                Ok(RenderMsg::CycleToneMap) => state.cycle_tonemap(),
+                Ok(RenderMsg::ScaleExposure(f)) => state.scale_exposure(f),
                 Ok(RenderMsg::Exit) | Err(TryRecvError::Disconnected) => return,
                 Err(TryRecvError::Empty) => break,
             }
@@ -316,6 +339,18 @@ impl ApplicationHandler for App {
                     let _ = sender.send(RenderMsg::CycleMesh);
                 }
                 Key::Named(NamedKey::Escape) => event_loop.exit(),
+                Key::Character(s) => match s.as_str() {
+                    "t" | "T" => {
+                        let _ = sender.send(RenderMsg::CycleToneMap);
+                    }
+                    "+" | "=" => {
+                        let _ = sender.send(RenderMsg::ScaleExposure(1.25));
+                    }
+                    "-" | "_" => {
+                        let _ = sender.send(RenderMsg::ScaleExposure(0.8));
+                    }
+                    _ => {}
+                },
                 _ => {}
             },
             _ => {}
@@ -350,7 +385,9 @@ fn custom_quad() -> MeshData {
 }
 
 fn main() {
-    println!("NacreEngine raw-wgpu demo — Space: cycle mesh (cube / sphere / custom), Esc: quit");
+    println!(
+        "NacreEngine raw-wgpu demo — Space: cycle mesh · T: tone-map operator · +/-: exposure · Esc: quit"
+    );
     let event_loop = EventLoop::new().expect("create event loop");
     // The render thread drives frames; the main thread only waits for OS events.
     event_loop.set_control_flow(ControlFlow::Wait);
